@@ -1,0 +1,36 @@
+/**
+ * This is a basic example of an ivan interface.
+ */
+interface Basic {
+    fun noArgs(): i64;
+    /**
+     * Find the value by searching through the specified bytes.
+     *
+     * Bytes is a const '&' pointer, so you're expected not to mutate it.
+     * It must be valid for the duration of the call.
+     *
+     * The output (if any) is placed in `result`.
+     * It's a `&mut` pointer, so it's expected to be mutable
+     * and have no-aliasing for the duration of the call.
+     */
+    fun findInBytes(bytes: &byte, start: usize, result: &mut usize): bool;
+
+    // This lifetime is too complex to be given anything but a 'raw' pointer
+    fun complexLifetime(): &raw byte;
+}
+
+/**
+ * Here is another interface
+ *
+ * You can have multiple ones defined
+ */
+interface Other {
+    fun test(d: double);
+}
+
+// No docs
+interface NoMethods {
+    // This one has no methods
+}
+
+fun topLevel();
