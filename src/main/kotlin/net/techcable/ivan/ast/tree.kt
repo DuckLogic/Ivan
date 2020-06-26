@@ -31,3 +31,12 @@ data class InterfaceDef(
     val docString: DocString?,
     val span: Span
 ): PrimaryItem()
+
+/**
+ * The definition of an opaque type
+ */
+data class OpaqueTypeDef(
+    override val name: String,
+    val docString: DocString?,
+    val span: Span
+): PrimaryItem()

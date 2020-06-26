@@ -123,12 +123,23 @@ class ParserTest {
                     methods = listOf(),
                     span = Span(32, 10)
                 ),
+                OpaqueTypeDef(
+                    name = "Example",
+                    docString = DocString(
+                        listOf("A type defined elsewhere in user code"),
+                        Span(36, 0)
+                    ),
+                    span = Span(39, 12)
+                ),
                 FunctionDef(
                     name = "topLevel",
                     docString = null,
-                    args = listOf(),
+                    args = listOf(FunctionArg(
+                        "e",
+                        UnresolvedType("Example", usageSpan = Span(41, 16))
+                    )),
                     returnType = PrimitiveType.UNIT,
-                    span = Span(36, 4)
+                    span = Span(41, 4)
                 )
             ),
             parseAll(Parser.fromString(basicText))

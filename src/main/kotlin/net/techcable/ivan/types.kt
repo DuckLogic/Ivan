@@ -1,5 +1,6 @@
 package net.techcable.ivan
 
+import net.techcable.ivan.ast.Span
 import java.lang.IllegalArgumentException
 
 sealed class NativeType(
@@ -15,6 +16,24 @@ sealed class NativeType(
     abstract fun toRust(): String
 }
 
+/**
+ * A type that hasn't been resolved
+ */
+class UnresolvedType(
+    name: String,
+    val usageSpan: Span
+): NativeType(name) {
+    override fun toC11() = throw IllegalStateException("Unresolved $this")
+    override fun toRust() = throw IllegalStateException("Unresolved $this")
+
+    override fun equals(other: Any?) = other is UnresolvedType
+            && other.name == this.name
+            && other.usageSpan == this.usageSpan
+
+    override fun hashCode() = this.name.hashCode() xor usageSpan.hashCode()
+
+    override fun toString() = "UnresolvedType(${this.name}, usageSpan=${this.usageSpan})"
+}
 
 data class ReferenceType(
     val target: NativeType,

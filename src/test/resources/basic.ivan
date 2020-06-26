@@ -33,4 +33,9 @@ interface NoMethods {
     // This one has no methods
 }
 
-fun topLevel();
+/**
+ * A type defined elsewhere in user code
+ */
+opaque type Example;
+
+fun topLevel(e: Example);

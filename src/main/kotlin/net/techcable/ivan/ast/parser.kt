@@ -78,6 +78,18 @@ fun parseDocString(parser: Parser): DocString? {
     }
     return DocString(lines = docLines, span = token.span)
 }
+fun parseOpaqueType(parser: Parser, docString: DocString?): OpaqueTypeDef {
+    parser.expectToken(TokenType.Opaque)
+    parser.expectToken(TokenType.Type)
+    val startSpan = parser.currentSpan
+    val name = parser.expectIdentifier()
+    parser.expectToken(TokenType.Semicolon)
+    return OpaqueTypeDef(
+        name = name,
+        span = startSpan,
+        docString = docString
+    )
+}
 fun parseInterface(parser: Parser, docString: DocString?): InterfaceDef {
     parser.expectToken(TokenType.Interface)
     val startSpan = parser.currentSpan
@@ -227,7 +239,7 @@ fun parseType(parser: Parser): NativeType {
             }
         )
     }
-    throw ParseException("Invalid type name: $typeName", identToken.span)
+    return UnresolvedType(typeName, usageSpan = identToken.span)
 }
 
 fun parseItem(parser: Parser, docString: DocString? = null): PrimaryItem {
@@ -242,6 +254,7 @@ fun parseItem(parser: Parser, docString: DocString? = null): PrimaryItem {
         }
         TokenType.Function -> parseFunc(parser, docString = docString)
         TokenType.Interface -> parseInterface(parser, docString = docString)
+        TokenType.Opaque -> parseOpaqueType(parser, docString = docString)
         else -> throw ParseException("Expected item", token.span)
     }
 }

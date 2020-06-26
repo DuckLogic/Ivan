@@ -36,7 +36,9 @@ enum class TokenType(val text: String?) {
     Function("fun"),
     Raw("raw"),
     Mut("mut"),
-    Own("own")
+    Own("own"),
+    Opaque("opaque"),
+    Type("type"),
 }
 
 val keywordMap: Map<String, TokenType> = HashMap<String, TokenType>().apply {
