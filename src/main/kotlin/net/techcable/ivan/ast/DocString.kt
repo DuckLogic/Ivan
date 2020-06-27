@@ -8,7 +8,7 @@ data class DocString(val lines: List<String>, val span: Span) {
         check(lines.isNotEmpty())
     }
 
-    fun print(style: Style): MutableList<String> {
+    fun print(style: Style): List<String> {
         return when(style) {
             Style.Javadoc -> {
                 val result = mutableListOf("/**")

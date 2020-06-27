@@ -1,5 +1,6 @@
 package net.techcable.ivan
 
+import net.techcable.ivan.ast.OpaqueTypeDef
 import net.techcable.ivan.ast.Span
 import java.lang.IllegalArgumentException
 
@@ -14,6 +15,31 @@ sealed class NativeType(
 ) {
     abstract fun toC11(): String
     abstract fun toRust(): String
+}
+
+class OpaqueType(
+    val resolvedName: String,
+    val definition: OpaqueTypeDef
+): NativeType(definition.name) {
+    // Assume whatever resolvedName we were given is appropriate
+    override fun toC11() = resolvedName
+    override fun toRust() = resolvedName
+
+    override fun equals(other: Any?): Boolean {
+        return other is OpaqueType && other.name == this.name
+                && this.resolvedName == this.resolvedName
+                && this.definition == this.definition
+    }
+
+    override fun hashCode() = this.resolvedName.hashCode()
+
+    override fun toString(): String {
+        return if (this.name == this.resolvedName) {
+            "OpaqueType(${this.name})"
+        } else {
+            "OpaqueType(${this.name} -> ${this.resolvedName})"
+        }
+    }
 }
 
 /**
