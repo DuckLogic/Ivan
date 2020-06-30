@@ -2,6 +2,9 @@
 .idea
 *.iml
 
-# Gradle
-build
-.gradle
+# Python
+*.egg-info
+__pycache__
+
+# PyTest
+.pytest_cache
