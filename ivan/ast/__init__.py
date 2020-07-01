@@ -8,7 +8,7 @@ from ..types import IvanType
 __all__ = [
     "lexer", "parser", "DocString",
     # AST Items
-    "PrimaryItem", "InterfaceDef", "FunctionDef", "OpaqueTypeDef",
+    "PrimaryItem", "InterfaceDef", "FunctionDeclaration", "OpaqueTypeDef",
     # AST Nodes
     "FunctionArg"
 ]
@@ -55,20 +55,24 @@ class FunctionArg:
     arg_type: IvanType
 
 
-@dataclass
-class FunctionDef(PrimaryItem):
+@dataclass(frozen=True)
+class FunctionSignature:
     args: List[FunctionArg]
     return_type: IvanType
-    span: Span
+
+
+@dataclass
+class FunctionDeclaration(PrimaryItem):
+    signature: FunctionSignature
 
     def visit(self, visitor: "AstVisitor"):
-        visitor.visit_function_def(self)
+        visitor.visit_function_declaration(self)
 
 
 @dataclass
 class InterfaceDef(PrimaryItem):
     """The definition of an interface"""
-    methods: List[FunctionDef]
+    methods: List[FunctionDeclaration]
     span: Span
 
     def visit(self, visitor: "AstVisitor"):
@@ -84,12 +88,12 @@ class OpaqueTypeDef(PrimaryItem):
 
 
 class AstVisitor(metaclass=ABCMeta):
-    def visit_function_def(self, func: FunctionDef):
+    def visit_function_declaration(self, func: FunctionDeclaration):
         pass
 
     def visit_interface_def(self, interface: InterfaceDef):
         for method in interface.methods:
-            self.visit_function_def(method)
+            self.visit_function_declaration(method)
 
     def visit_opaque_type_def(self, opaque: OpaqueTypeDef):
         pass

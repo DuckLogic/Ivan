@@ -1,11 +1,9 @@
-from ivan import types
-from ivan.ast import FunctionDef, DocString, InterfaceDef, FunctionArg, OpaqueTypeDef
-from ivan.ast.parser import parse_function_def, parse_item, parse_all, Parser
-from ivan.ast.lexer import Span
-
 from pathlib import Path
-import importlib.resources
 
+from ivan import types
+from ivan.ast import FunctionDeclaration, DocString, InterfaceDef, FunctionArg, OpaqueTypeDef, FunctionSignature
+from ivan.ast.lexer import Span
+from ivan.ast.parser import parse_item, parse_all, Parser
 from ivan.types import ReferenceType, ReferenceKind, UnresolvedTypeRef, FixedIntegerType
 
 
@@ -17,17 +15,19 @@ def test_parse_func():
      * On occasion
      */
     fun hello(i: int, floating: double);
-""")) == FunctionDef(
+""")) == FunctionDeclaration(
         name="hello",
         doc_string=DocString(
             ["Does some things", "", "On occasion"],
             span=Span(1, 0)
         ),
-        args=[
-            FunctionArg("i", types.INT),
-            FunctionArg("floating", types.DOUBLE)
-        ],
-        return_type=types.UNIT,
+        signature=FunctionSignature(
+            args=[
+                FunctionArg("i", types.INT),
+                FunctionArg("floating", types.DOUBLE)
+            ],
+            return_type=types.UNIT,
+        ),
         span=Span(6, 8)
     )
 
@@ -44,14 +44,16 @@ def test_parse_basic():
                 span=Span(1, 0)
             ),
             methods=[
-                FunctionDef(
+                FunctionDeclaration(
                     name="noArgs",
                     doc_string=None,
-                    args=[],
-                    return_type=FixedIntegerType(bits=64, signed=True),
+                    signature=FunctionSignature(
+                        args=[],
+                        return_type=FixedIntegerType(bits=64, signed=True),
+                    ),
                     span=Span(5, 8)
                 ),
-                FunctionDef(
+                FunctionDeclaration(
                     name="findInBytes",
                     doc_string=DocString(
                         ["Find the value by searching through the specified bytes.",
@@ -64,27 +66,31 @@ def test_parse_basic():
                          "and have no-aliasing for the duration of the call."],
                         span=Span(6, 4)
                     ),
-                    args=[
-                        FunctionArg("bytes", ReferenceType(
-                            target=types.BYTE,
-                            kind=ReferenceKind.IMMUTABLE
-                        )),
-                        FunctionArg("start", types.USIZE),
-                        FunctionArg("result", ReferenceType(
-                            target=types.USIZE,
-                            kind=ReferenceKind.MUTABLE
-                        ))
-                    ],
-                    return_type=types.BOOLEAN,
+                    signature=FunctionSignature(
+                        args=[
+                            FunctionArg("bytes", ReferenceType(
+                                target=types.BYTE,
+                                kind=ReferenceKind.IMMUTABLE
+                            )),
+                            FunctionArg("start", types.USIZE),
+                            FunctionArg("result", ReferenceType(
+                                target=types.USIZE,
+                                kind=ReferenceKind.MUTABLE
+                            ))
+                        ],
+                        return_type=types.BOOLEAN,
+                    ),
                     span=Span(16, 8)
                 ),
-                FunctionDef(
+                FunctionDeclaration(
                     name="complexLifetime",
                     doc_string=None,
-                    args=[],
-                    return_type=ReferenceType(
-                        types.BYTE,
-                        kind=ReferenceKind.RAW
+                    signature=FunctionSignature(
+                        args=[],
+                        return_type=ReferenceType(
+                            types.BYTE,
+                            kind=ReferenceKind.RAW
+                        ),
                     ),
                     span=Span(19, 8)
                 ),
@@ -100,13 +106,15 @@ def test_parse_basic():
                 Span(22, 0)
             ),
             methods=[
-                FunctionDef(
+                FunctionDeclaration(
                     name="test",
                     doc_string=None,
-                    args=[
-                        FunctionArg("d", types.DOUBLE)
-                    ],
-                    return_type=types.UNIT,
+                    signature=FunctionSignature(
+                        args=[
+                            FunctionArg("d", types.DOUBLE)
+                        ],
+                        return_type=types.UNIT,
+                    ),
                     span=Span(28, 8)
                 )
             ],
@@ -126,16 +134,18 @@ def test_parse_basic():
             ),
             span=Span(39, 12)
         ),
-        FunctionDef(
+        FunctionDeclaration(
             name="topLevel",
             doc_string=None,
-            args=[
-                FunctionArg("e", UnresolvedTypeRef(
-                    "Example",
-                    usage_span=Span(41, 16)
-                ))
-            ],
-            return_type=types.UNIT,
+            signature=FunctionSignature(
+                args=[
+                    FunctionArg("e", UnresolvedTypeRef(
+                        "Example",
+                        usage_span=Span(41, 16)
+                    ))
+                ],
+                return_type=types.UNIT,
+            ),
             span=Span(41, 4)
         )
     ]

@@ -2,7 +2,8 @@ import re
 from typing import List, Optional
 
 from ivan import types
-from ivan.ast import lexer, DocString, OpaqueTypeDef, InterfaceDef, FunctionDef, FunctionArg, PrimaryItem
+from ivan.ast import lexer, DocString, OpaqueTypeDef, InterfaceDef, FunctionDeclaration, FunctionArg, PrimaryItem, \
+    FunctionSignature
 from ivan.ast.lexer import Token, Span, ParseException, TokenType
 from ivan.types import ReferenceKind, ReferenceType, PrimitiveType, FixedIntegerType, UnresolvedTypeRef, IvanType
 
@@ -145,7 +146,7 @@ def parse_interface(parser: Parser, doc_string: Optional[DocString]) -> Interfac
             pending_comment = parse_doc_string(parser)
             assert pending_comment is not None
         elif token.is_keyword('fun'):
-            methods.append(parse_function_def(parser, pending_comment))
+            methods.append(parse_function_declaration(parser, pending_comment))
             pending_comment = None
         elif token.is_symbol('}'):
             parser.pop()
@@ -162,10 +163,7 @@ def parse_interface(parser: Parser, doc_string: Optional[DocString]) -> Interfac
             raise ParseException("Unexpected token", token.span)
 
 
-def parse_function_def(parser: Parser, doc_string: Optional[DocString]) -> FunctionDef:
-    parser.expect_keyword("fun")
-    start_span = parser.current_span
-    func_name = parser.expect_identifier()
+def parse_function_signature(parser: Parser) -> FunctionSignature:
     parser.expect_symbol('(')
     args = []
     while True:
@@ -189,20 +187,28 @@ def parse_function_def(parser: Parser, doc_string: Optional[DocString]) -> Funct
             break  # stop parsing args
         else:
             raise ParseException(f"Unexpected token {token.value!r}", token.span)
-    t = parser.pop()
+    t = parser.peek()
     if t.is_symbol(';'):
         return_type = types.UNIT
     elif t.is_symbol(':'):
+        parser.expect_symbol(':')
         return_type = parse_type(parser)
-        parser.expect_symbol(';')
     else:
         raise ParseException("Unexpected token", t.span)
-    return FunctionDef(
+    return FunctionSignature(return_type=return_type, args=args)
+
+
+def parse_function_declaration(parser: Parser, doc_string: Optional[DocString]) -> FunctionDeclaration:
+    parser.expect_keyword("fun")
+    start_span = parser.current_span
+    func_name = parser.expect_identifier()
+    signature = parse_function_signature(parser)
+    parser.expect_symbol(';')
+    return FunctionDeclaration(
         name=func_name,
-        args=args,
         span=start_span,
-        return_type=return_type,
-        doc_string=doc_string
+        doc_string=doc_string,
+        signature=signature
     )
 
 
@@ -273,7 +279,7 @@ def parse_item(parser: Parser, doc_string: Optional[DocString] = None) -> Primar
         assert doc_string is not None
         return parse_item(parser, doc_string=doc_string)
     elif token.is_keyword('fun'):
-        return parse_function_def(parser, doc_string=doc_string)
+        return parse_function_declaration(parser, doc_string=doc_string)
     elif token.is_keyword('interface'):
         return parse_interface(parser, doc_string=doc_string)
     elif token.is_keyword('opaque'):
