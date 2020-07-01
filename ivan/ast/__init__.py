@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Callable
 
 from .lexer import Span
 from ..types import IvanType
@@ -51,8 +51,8 @@ class PrimaryItem(metaclass=ABCMeta):
     def visit(self, visitor: AstVisitor) -> Optional[PrimaryItem]:
         pass
 
-    def update_types(self, updater: TypeUpdater) -> Optional[PrimaryItem]:
-        return self.visit(TypeRewriter(updater))
+    def update_types(self, updater: Callable[[IvanType], IvanType]) -> Optional[PrimaryItem]:
+        return self.visit(TypeUpdater(updater))
 
 
 @dataclass(frozen=True)
@@ -94,28 +94,14 @@ class OpaqueTypeDef(PrimaryItem):
 
 
 class AstVisitor(metaclass=ABCMeta):
-    @abstractmethod
-    def visit_function_declaration(self, func: FunctionDeclaration) -> Optional[FunctionDeclaration]:
-        pass
+    def visit_type(self, original: IvanType) -> Optional[IvanType]:
+        return None  # No children
 
-    @abstractmethod
-    def visit_interface_def(self, interface: InterfaceDef) -> Optional[InterfaceDef]:
-        pass
-
-    @abstractmethod
-    def visit_opaque_type_def(self, opaque: OpaqueTypeDef) -> Optional[OpaqueTypeDef]:
-        pass
-
-
-class TypeUpdater(metaclass=ABCMeta):
-    @abstractmethod
-    def update_type(self, original: IvanType) -> Optional[IvanType]:
-        pass
-
-    def update_signature(self, signature: FunctionSignature) -> Optional[FunctionSignature]:
+    def visit_signature(self, signature: FunctionSignature) -> Optional[FunctionSignature]:
+        # Children: FunctionSignature.args, FunctionSignature.return_type
         copied_args = None
         for index, original_arg in enumerate(signature.args):
-            updated_type = self.update_type(original_arg.arg_type)
+            updated_type = self.visit_type(original_arg.arg_type)
             if updated_type is not None:
                 if copied_args is None:
                     copied_args = signature.args.copy()
@@ -123,7 +109,7 @@ class TypeUpdater(metaclass=ABCMeta):
                     arg_name=original_arg.arg_name,
                     arg_type=updated_type
                 )
-        updated_return_type = self.update_type(signature.return_type)
+        updated_return_type = self.visit_type(signature.return_type)
         if copied_args is None and updated_return_type is None:
             return None
         return FunctionSignature(
@@ -132,22 +118,16 @@ class TypeUpdater(metaclass=ABCMeta):
             else signature.return_type
         )
 
-
-class TypeRewriter(AstVisitor):
-    """Rewrites the types in the AST using a TypeUpdater"""
-    updater: TypeUpdater
-
-    def __init__(self, updater: TypeUpdater):
-        self.updater = updater
-
     def visit_function_declaration(self, func: FunctionDeclaration) -> Optional[FunctionDeclaration]:
-        updated_signature = self.updater.update_signature(func.signature)
+        # Children: FunctionDeclaration.signature
+        updated_signature = self.visit_signature(func.signature)
         if updated_signature is not None:
             return dataclasses.replace(func, signature=updated_signature)
         else:
             return None
 
     def visit_interface_def(self, interface: InterfaceDef) -> Optional[InterfaceDef]:
+        # Children: InterfaceDef.methods
         updated_methods = None
         for index, method in enumerate(interface.methods):
             updated_method = self.visit_function_declaration(method)
@@ -161,4 +141,14 @@ class TypeRewriter(AstVisitor):
             return None
 
     def visit_opaque_type_def(self, opaque: OpaqueTypeDef) -> Optional[OpaqueTypeDef]:
-        return None  # Never need to rewrite anything
+        return None  # No children to visit
+
+
+class TypeUpdater(AstVisitor):
+    """Rewrites the types in the AST using a callaback"""
+    def __init__(self, updater: Callable[[IvanType], IvanType]):
+        self.updater = updater
+
+    def visit_type(self, original: IvanType) -> Optional[IvanType]:
+        return self.updater(original)
+
