@@ -37,6 +37,8 @@ class DocString:
     def print_like_rust(self) -> List[str]:
         return [f"/// {line}" if line else "///" for line in self.lines]
 
+    def __bool__(self):
+        return self.lines != []
 
 @dataclass(frozen=True)
 class PrimaryItem(metaclass=ABCMeta):
@@ -51,8 +53,12 @@ class PrimaryItem(metaclass=ABCMeta):
     def visit(self, visitor: AstVisitor) -> Optional[PrimaryItem]:
         pass
 
-    def update_types(self, updater: Callable[[IvanType], IvanType]) -> Optional[PrimaryItem]:
-        return self.visit(TypeUpdater(updater))
+    def update_types(self, updater: Callable[[IvanType], IvanType]) -> PrimaryItem:
+        updated = self.visit(TypeUpdater(updater))
+        if updated is not None:
+            return updated
+        else:
+            return self
 
 
 @dataclass(frozen=True)

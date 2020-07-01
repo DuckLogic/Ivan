@@ -1,6 +1,8 @@
-#
+import re
 from contextlib import contextmanager
 from typing import ContextManager, Optional, Iterable
+
+VALID_MODULE_NAME_PATTERN = re.compile(r'^([\w.])+$')
 
 
 class CodeWriter:
@@ -45,15 +47,19 @@ class CodeWriter:
             self._lines.append('\n')
             last_written = newline_index + 1
             if last_written >= len(s): return
-            newline_index = s.index('\n', last_written)
-            if newline_index < 0: break
+            newline_index = s.find('\n', last_written)
+            if newline_index < 0:
+                break
         self._current_line_buffer.append(s[last_written:len(s)])
 
     def write(self, s: str) -> "CodeWriter":
-        first_newline = s.index('\n')
+        first_newline = s.find('\n')
         if first_newline >= 0:
             if first_newline == 0:
-                self._flush_buffer()
+                if self._current_line_buffer:
+                    self._flush_buffer()
+                else:
+                    self._lines.append('')
                 return self
             self._write_multiline(s, first_newline)
         else:

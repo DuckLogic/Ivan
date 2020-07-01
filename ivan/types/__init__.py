@@ -3,7 +3,6 @@ from enum import Enum
 from typing import Optional
 
 from ivan.ast.lexer import Span
-import ivan
 
 
 class UnresolvedTypeException(Exception):
@@ -52,28 +51,6 @@ class IvanType(metaclass=ABCMeta):
         pass
 
 
-class OpaqueTypeRef(IvanType):
-    definition: "ivan.ast.OpaqueTypeDef"
-    resolved_name: str
-
-    def __init__(self, definition: "ivan.ast.OpaqueTypeDef", resolved: str):
-        super().__init__(definition.name)
-        self.definition = definition
-        self.resolved_name = resolved
-
-    def print_c11(self) -> str:
-        return self.resolved_name
-
-    def print_rust(self) -> str:
-        return self.resolved_name
-
-    def __repr__(self):
-        if self.resolved_name == self.definition.name:
-            return f"OpaqueTypeRef({self.resolved_name})"
-        else:
-            return f"OpaqueTypeRef({self.definition.name}, resolved={self.resolved_name})"
-
-
 class UnresolvedTypeRef(IvanType):
     """A named type which hasn't been resolved"""
     usage_span: Span
@@ -119,8 +96,10 @@ class ReferenceType(IvanType):
 
     def print_c11(self) -> str:
         # Everything is a pointer in C!
-        # TODO: Const vs non-const
-        return f"*{self.target.print_c11()}"
+        if self.kind == ReferenceKind.IMMUTABLE:
+            return f"const {self.target.print_c11()}*"
+        else:
+            return f"{self.target.print_c11()}*"
 
     def print_rust(self) -> str:
         if self.kind == ReferenceKind.IMMUTABLE:
@@ -155,9 +134,9 @@ class FixedIntegerType(IvanType):
 
     def print_c11(self) -> str:
         if self.signed:
-            return f"int${self.bits}_t"
+            return f"int{self.bits}_t"
         else:
-            return f"uint${self.bits}_t"
+            return f"uint{self.bits}_t"
 
     def print_rust(self) -> str:
         return self.name
