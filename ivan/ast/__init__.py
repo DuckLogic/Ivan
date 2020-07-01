@@ -1,4 +1,4 @@
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -44,6 +44,10 @@ class PrimaryItem(metaclass=ABCMeta):
     doc_string: Optional[DocString]
     """The documentation for this item"""
 
+    @abstractmethod
+    def visit(self, visitor: "AstVisitor"):
+        pass
+
 
 @dataclass(frozen=True)
 class FunctionArg:
@@ -57,6 +61,9 @@ class FunctionDef(PrimaryItem):
     return_type: IvanType
     span: Span
 
+    def visit(self, visitor: "AstVisitor"):
+        visitor.visit_function_def(self)
+
 
 @dataclass
 class InterfaceDef(PrimaryItem):
@@ -64,8 +71,25 @@ class InterfaceDef(PrimaryItem):
     methods: List[FunctionDef]
     span: Span
 
+    def visit(self, visitor: "AstVisitor"):
+        visitor.visit_interface_def(self)
+
 
 @dataclass
 class OpaqueTypeDef(PrimaryItem):
     """The definition of an opaque type"""
-    pass
+
+    def visit(self, visitor: "AstVisitor"):
+        visitor.visit_opaque_type_def(self)
+
+
+class AstVisitor(metaclass=ABCMeta):
+    def visit_function_def(self, func: FunctionDef):
+        pass
+
+    def visit_interface_def(self, interface: InterfaceDef):
+        for method in interface.methods:
+            self.visit_function_def(method)
+
+    def visit_opaque_type_def(self, opaque: OpaqueTypeDef):
+        pass
