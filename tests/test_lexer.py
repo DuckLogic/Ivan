@@ -1,7 +1,7 @@
 from typing import List
 
-from src.ivan.ast import lexer
-from src.ivan.ast.lexer import Token, Span, TokenType
+from ivan.ast import lexer
+from ivan.ast.lexer import Token, Span, TokenType
 
 
 def lex(s: str) -> List[Token]:

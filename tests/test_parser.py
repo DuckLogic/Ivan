@@ -6,7 +6,7 @@ from ivan.ast.lexer import Span
 from pathlib import Path
 import importlib.resources
 
-from src.ivan.types import ReferenceType, ReferenceKind, UnresolvedTypeRef, FixedIntegerType
+from ivan.types import ReferenceType, ReferenceKind, UnresolvedTypeRef, FixedIntegerType
 
 
 def test_parse_func():
@@ -35,7 +35,8 @@ def test_parse_func():
 def test_parse_basic():
     with open(Path(Path(__file__).parent, "basic.ivan"), "rt") as f:
         basic_text = f.read()
-    assert parse_all(Parser.parse_str(basic_text)) == [
+    parsed = parse_all(Parser.parse_str(basic_text))
+    expected = [
         InterfaceDef(
             name="Basic",
             doc_string=DocString(
@@ -138,3 +139,4 @@ def test_parse_basic():
             span=Span(41, 4)
         )
     ]
+    assert parsed == expected

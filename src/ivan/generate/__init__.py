@@ -1,7 +1,7 @@
 #
 from contextlib import contextmanager
 from typing import ContextManager, List, Optional, Iterable
-
+from abc import ABC
 
 class CodeWriter:
     current_indent: int
