@@ -8,6 +8,14 @@ def lex(s: str) -> List[Token]:
     return list(lexer.lex_all(s))
 
 
+def test_lex_str():
+    assert lex('"string literal"') == [Token(
+        span=Span(1, 0),
+        value="string literal",
+        token_type=TokenType.STRING_LITERAL
+    )]
+
+
 def test_lex_doc():
     assert lex(
         """/**

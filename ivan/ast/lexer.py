@@ -11,7 +11,7 @@ class Span:
     column: int
 
 
-VALID_SYMBOLS = {"{", "}", ":", ";", ",", "&", "*", "(", ")"}
+VALID_SYMBOLS = {"{", "}", ":", ";", ",", "&", "*", '@', "(", ")"}
 VALID_KEYWORDS = {"Self", "self", "interface", "fun", "raw", "mut", "own", "opaque", "type"}
 
 
@@ -20,7 +20,7 @@ class TokenType(Enum):
     DOC_COMMENT = 1
     SYMBOL = 2
     KEYWORD = 3
-
+    STRING_LITERAL = 4
 
 class ParseException(Exception):
     span: Span
@@ -90,6 +90,28 @@ def lex_next(lexer: "Lexer") -> Optional[Token]:
             )
         else:
             raise ParseException(f"Unexpected char: {c}", lexer.span)
+    elif c == '"':
+        start_span = lexer.span()
+        lexer.skip_text('"')
+        result = []
+        while True:
+            c = lexer.peek()
+            if c == '\\':
+                escape_symbol = lexer.peek(1)
+                if escape_symbol == '\\':
+                    result.append('\\')
+                elif escape_symbol == '"':
+                    result.append('"')
+                else:
+                    raise ParseException(f"Invalid escape: {c!r}", lexer.span())
+                lexer.index += 2
+            elif c == '"':
+                break
+            else:
+                result.append(c)
+                lexer.index += 1
+        lexer.skip_text('"')
+        return Token(TokenType.STRING_LITERAL, ''.join(result), start_span)
     else:
         if c.isspace():
             # Skip all other whitespace
