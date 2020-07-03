@@ -1,7 +1,7 @@
 /**
  * This is a basic example of an ivan interface.
  */
-@GenerateWrappers(prefix="basic")
+@GenerateWrappers(prefix="basic", include_doc=false)
 interface Basic {
     fun noArgs(): i64;
     /**
@@ -26,7 +26,7 @@ interface Basic {
  *
  * You can have multiple ones defined
  */
-@GenerateWrappers(prefix="other")
+@GenerateWrappers(prefix="other", indirect_vtable=false)
 interface Other {
     fun test(d: double);
 }

@@ -1,31 +1,24 @@
 from __future__ import annotations
 
-from typing import List, Sequence, Optional
+from typing import Sequence, Optional
 
 from ivan import types
-from ivan.ast import AstVisitor, OpaqueTypeDef, InterfaceDef, FunctionDeclaration, FunctionSignature, FunctionArg, \
+from ivan.ast import OpaqueTypeDef, InterfaceDef, FunctionDeclaration, FunctionSignature, FunctionArg, \
     DocString
-from ivan.generate import CodeWriter, VALID_MODULE_NAME_PATTERN
+from ivan.generate import CodeWriter, CodeGenerator
 from ivan.types import IvanType, ReferenceType, ReferenceKind
 
 
-class C11CodeGenerator(AstVisitor):
-    writer: CodeWriter
-    name: str
-
-    def __init__(self, writer: CodeWriter, name: str):
-        assert VALID_MODULE_NAME_PATTERN.match(name), f"Invalid name: {name!r}"
-        self.writer = writer
-        self.name = name
-
+class C11CodeGenerator(CodeGenerator):
     @property
     def header_name(self) -> str:
-        return self.name.upper().replace('.', '_') + "_H"
+        return self.module.name.upper().replace('.', '_') + "_H"
 
-    def write_header(self, imports: Sequence[str] = ()):
-        self.writer.writeln(f"#ifndef {self.header_name}")
-        self.writer.writeln(f"#define {self.header_name}")
-        self.writer.writeln()
+    def write_header(self):
+        imports = []  # TODO: Configurable imports
+        self.writeln(f"#ifndef {self.header_name}")
+        self.writeln(f"#define {self.header_name}")
+        self.writeln()
         std_imports = ["<stdint.h>", "<stdbool.h>", "<stdlib.h>"]
         global_imports = []
         local_imports = []
@@ -40,66 +33,66 @@ class C11CodeGenerator(AstVisitor):
                 raise ValueError(f"Invalid import: {header!r}")
         if std_imports:
             for include in std_imports:
-                self.writer.writeln(f"#include {include}")
-            self.writer.writeln()
+                self.writeln(f"#include {include}")
+            self.writeln()
         if global_imports:
             for include in global_imports:
-                self.writer.writeln(f"#include {include}")
-            self.writer.writeln()
+                self.writeln(f"#include {include}")
+            self.writeln()
         if local_imports:
             for include in global_imports:
-                self.writer.writeln(f"#include {include}")
-            self.writer.writeln()
+                self.writeln(f"#include {include}")
+            self.writeln()
 
     def write_footer(self):
-        self.writer.writeln(f"#endif /* {self.header_name} */")
-        self.writer.writeln()
+        self.writeln(f"#endif /* {self.header_name} */")
+        self.writeln()
 
     def write_doc(self, doc_string: Optional[DocString]):
         if doc_string:
             for line in doc_string.print_like_java():
-                self.writer.writeln(line)
+                self.writeln(line)
 
     def write_function_signature(self, name: str, signature: FunctionSignature):
-        self.writer.write(f'{signature.return_type.print_c11()} {name}(')
-        self.writer.write(', '.join(f"{arg.arg_type.print_c11()} {arg.arg_name}"
+        self.write(f'{signature.return_type.print_c11()} {name}(')
+        self.write(', '.join(f"{arg.arg_type.print_c11()} {arg.arg_name}"
                                     for arg in signature.args))
-        self.writer.write(')')
+        self.write(')')
 
     def declare_function_pointer(self, name: str, signature: FunctionSignature):
-        self.writer.write(f'{signature.return_type.print_c11()} (*{name})(')
-        self.writer.write(', '.join(f"{arg.arg_type.print_c11()} {arg.arg_name}"
+        self.write(f'{signature.return_type.print_c11()} (*{name})(')
+        self.write(', '.join(f"{arg.arg_type.print_c11()} {arg.arg_name}"
                                     for arg in signature.args))
-        self.writer.write(')')
+        self.write(')')
 
-    def visit_function_declaration(self, func: FunctionDeclaration):
+    def _declare_top_level_function(self, func: FunctionDeclaration):
         self.write_doc(func.doc_string)
         self.write_function_signature(func.name, func.signature)
-        self.writer.writeln(';')
+        self.writeln(';')
 
-    def visit_interface_def(self, interface: InterfaceDef):
+    def _declare_interface(self, interface: InterfaceDef):
         self.write_doc(interface.doc_string)
-        self.writer.writeln(f"typedef struct {interface.name} {{")
-        with self.writer.with_indent():
+        self.writeln(f"typedef struct {interface.name} {{")
+        with self.with_indent():
             for method in interface.methods:
                 self.write_doc(method.doc_string)
                 self.declare_function_pointer(method.name, method.signature)
-                self.writer.writeln(';')
-        self.writer.writeln(f"}} {interface.name};")
+                self.writeln(';')
+        self.writeln(f"}} {interface.name};")
 
-    def visit_opaque_type_def(self, opaque: OpaqueTypeDef):
+    def _declare_opaque_type(self, opaque: OpaqueTypeDef):
         self.write_doc(opaque.doc_string)
-        self.writer.writeln(f"typedef struct {opaque.name} {opaque.name};")
+        self.writeln(f"typedef struct {opaque.name} {opaque.name};")
 
-    def write_wrapper_method(
+    def _write_wrapper_method(
             self, wrapper_name: str, interface_type: IvanType,
             target_method: FunctionDeclaration,
-            indirect_vtable=True, include_doc=False
+            doc_string: Optional[DocString],
+            indirect_vtable: bool
     ):
         """Generate a wrapper method for the specified interface"""
         assert all('vtable' != arg.arg_name for arg in target_method.signature.args)
-        if include_doc:
-            self.write_doc(target_method.doc_string)
+        self.write_doc(doc_string)
         if indirect_vtable:
             vtable_type = ReferenceType(interface_type, ReferenceKind.IMMUTABLE)
         else:
@@ -108,8 +101,8 @@ class C11CodeGenerator(AstVisitor):
             args=[FunctionArg("vtable", vtable_type), *target_method.signature.args],
             return_type=target_method.signature.return_type
         ))
-        self.writer.writeln(' {')
-        with self.writer.with_indent() as writer:
+        self.writeln(' {')
+        with self.with_indent() as writer:
             if target_method.signature.return_type != types.UNIT:
                 writer.write("return ")
             if indirect_vtable:
@@ -120,4 +113,4 @@ class C11CodeGenerator(AstVisitor):
             writer.write('(')
             writer.write(', '.join(f"{arg.arg_name}" for arg in target_method.signature.args))
             writer.writeln(');')
-        self.writer.writeln('}')
+        self.writeln('}')

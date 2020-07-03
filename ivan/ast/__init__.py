@@ -88,6 +88,13 @@ class PrimaryItem(metaclass=ABCMeta):
         else:
             return self
 
+    def get_annotation(self, name: str) -> Optional[Annotation]:
+        # TODO: Check for duplicates
+        for annotation in self.annotations:
+            if annotation.name == name:
+                return annotation
+        return None
+
 
 @dataclass(frozen=True)
 class FunctionArg:

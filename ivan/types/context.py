@@ -1,8 +1,10 @@
 from __future__ import annotations
-from typing import Dict, List, Optional
+
+import dataclasses
+from typing import Dict, List, Optional, TypeVar, Union
 
 from . import IvanType
-from ..ast import OpaqueTypeDef, PrimaryItem, InterfaceDef, AstVisitor
+from ..ast import OpaqueTypeDef, PrimaryItem, InterfaceDef, AstVisitor, IvanModule
 from ..ast.lexer import Span
 
 
@@ -58,6 +60,11 @@ class TypeContext:
         self.opaque_types = {}
         self.interface_types = {}
 
+    def resolve_module(self, target: IvanModule) -> IvanModule:
+        return dataclasses.replace(target,
+            items=[item.replace_types(self.resolve_type) for item in target.items]
+        )
+
     def resolve_type(self, target: IvanType) -> IvanType:
         if not isinstance(target, UnresolvedTypeRef):
             return target
@@ -83,9 +90,9 @@ class TypeContext:
         return item in self.opaque_types or item in self.interface_types
 
     @staticmethod
-    def build_context(items: List[PrimaryItem]) -> TypeContext:
+    def build_context(mod: IvanModule) -> TypeContext:
         builder = TypeContextBuilder()
-        for item in items:
+        for item in mod.items:
             item.visit(builder)
         return builder.context
 

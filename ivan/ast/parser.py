@@ -381,11 +381,11 @@ def parse_item(parser: Parser) -> PrimaryItem:
         raise ParseException(f"Expected item but got {token.value!r}", token.span)
 
 
-def parse_module(parser: Parser, module_name: str) -> IvanModule:
+def parse_module(parser: Parser, name: str) -> IvanModule:
     items = []
     while parser.peek() is not None:
         items.append(parse_item(parser))
     return IvanModule(
         items=items,
-        name=module_name
+        name=name
     )

@@ -62,7 +62,7 @@ def test_parse_annotation():
 def test_parse_basic():
     with open(Path(Path(__file__).parent, "basic.ivan"), "rt") as f:
         basic_text = f.read()
-    parsed = parse_module(Parser.parse_str(basic_text), module_name="ivan.basic")
+    parsed = parse_module(Parser.parse_str(basic_text), name="ivan.basic")
     expected_items = [
         InterfaceDef(
             name="Basic",
@@ -136,7 +136,8 @@ def test_parse_basic():
                 Annotation(
                     name="GenerateWrappers",
                     values={
-                        "prefix": "basic"
+                        "prefix": "basic",
+                        "include_doc": False
                     },
                     span=Span(4, 1)
                 )
@@ -169,7 +170,8 @@ def test_parse_basic():
                 Annotation(
                     name="GenerateWrappers",
                     values={
-                        "prefix": "other"
+                        "prefix": "other",
+                        "indirect_vtable": False
                     },
                     span=Span(29, 1)
                 )
