@@ -49,17 +49,21 @@ class ReferenceKind(Enum):
 class ReferenceType(IvanType):
     target: IvanType
     kind: ReferenceKind
+    optional: bool
 
-    def __init__(self, target: IvanType, kind: ReferenceKind):
+    def __init__(self, target: IvanType, kind: ReferenceKind, optional: bool = False):
         super().__init__(
+            ("opt " if optional else "") +
             f"&{target.name}" if kind == ReferenceKind.IMMUTABLE
             else f"{kind.value} {target.name}"
         )
+        self.optional = optional
         self.target = target
         self.kind = kind
 
     def print_c11(self) -> str:
         # Everything is a pointer in C!
+        # We don't care about "Optional"
         if self.kind == ReferenceKind.IMMUTABLE:
             return f"const {self.target.print_c11()}*"
         else:
@@ -69,19 +73,25 @@ class ReferenceType(IvanType):
         if self.kind == ReferenceKind.IMMUTABLE:
             # TODO: Are references always safe to use?
             # This pretty-low level FFI code....
-            return f"&{self.target.print_rust()}"
+            ref_type = f"&{self.target.print_rust()}"
         elif self.kind == ReferenceKind.MUTABLE:
-            return f"&mut {self.target.print_rust()}"
+            ref_type = f"&mut {self.target.print_rust()}"
         elif self.kind == ReferenceKind.OWNED or\
                 self.kind == ReferenceKind.RAW:
             # Rust doesn't have a way to handle these natively
             # We just map them to raw pointers
+            # At this point we don't care about nullability
             return f"*mut {self.target.print_rust()}"
         else:
             raise AssertionError(f"Unknown kind: {self.kind}")
+        assert ref_type
+        if self.optional:
+            return f"Optional<{ref_type}>"
+        else:
+            return ref_type
 
     def __repr__(self):
-        return f"ReferenceType({self.target}, {self.kind})"
+        return f"ReferenceType({self.target}, {self.kind}, optional={self.optional})"
 
 
 class FixedIntegerType(IvanType):

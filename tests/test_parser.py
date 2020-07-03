@@ -4,9 +4,17 @@ from ivan import types
 from ivan.ast import FunctionDeclaration, DocString, InterfaceDef, FunctionArg, OpaqueTypeDef, FunctionSignature, \
     Annotation
 from ivan.ast.lexer import Span
-from ivan.ast.parser import parse_item, parse_all, Parser, parse_annotation
+from ivan.ast.parser import parse_item, parse_all, Parser, parse_annotation, parse_type
 from ivan.types import ReferenceType, ReferenceKind, FixedIntegerType
 from ivan.types.context import UnresolvedTypeRef
+
+
+def test_parse_types():
+    assert parse_type(Parser.parse_str("opt &byte")) == ReferenceType(
+        kind=ReferenceKind.IMMUTABLE,
+        target=types.BYTE,
+        optional=True
+    )
 
 
 def test_parse_func():
