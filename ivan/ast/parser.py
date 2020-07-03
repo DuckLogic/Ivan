@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from ivan import types
 from ivan.ast import lexer, DocString, OpaqueTypeDef, InterfaceDef, FunctionDeclaration, FunctionArg, PrimaryItem, \
-    FunctionSignature, Annotation, AnnotationValue
+    FunctionSignature, Annotation, AnnotationValue, IvanModule
 from ivan.ast.lexer import Token, Span, ParseException, TokenType
 from ivan.types import ReferenceKind, ReferenceType, PrimitiveType, FixedIntegerType, IvanType
 from ivan.types.context import UnresolvedTypeRef
@@ -381,8 +381,11 @@ def parse_item(parser: Parser) -> PrimaryItem:
         raise ParseException(f"Expected item but got {token.value!r}", token.span)
 
 
-def parse_all(parser: Parser) -> List[PrimaryItem]:
-    result = []
+def parse_module(parser: Parser, module_name: str) -> IvanModule:
+    items = []
     while parser.peek() is not None:
-        result.append(parse_item(parser))
-    return result
+        items.append(parse_item(parser))
+    return IvanModule(
+        items=items,
+        name=module_name
+    )

@@ -2,9 +2,9 @@ from pathlib import Path
 
 from ivan import types
 from ivan.ast import FunctionDeclaration, DocString, InterfaceDef, FunctionArg, OpaqueTypeDef, FunctionSignature, \
-    Annotation
+    Annotation, IvanModule
 from ivan.ast.lexer import Span
-from ivan.ast.parser import parse_item, parse_all, Parser, parse_annotation, parse_type
+from ivan.ast.parser import parse_item, parse_module, Parser, parse_annotation, parse_type
 from ivan.types import ReferenceType, ReferenceKind, FixedIntegerType
 from ivan.types.context import UnresolvedTypeRef
 
@@ -62,8 +62,8 @@ def test_parse_annotation():
 def test_parse_basic():
     with open(Path(Path(__file__).parent, "basic.ivan"), "rt") as f:
         basic_text = f.read()
-    parsed = parse_all(Parser.parse_str(basic_text))
-    expected = [
+    parsed = parse_module(Parser.parse_str(basic_text), module_name="ivan.basic")
+    expected_items = [
         InterfaceDef(
             name="Basic",
             doc_string=DocString(
@@ -207,4 +207,7 @@ def test_parse_basic():
             annotations=[]
         )
     ]
-    assert parsed == expected
+    assert parsed == IvanModule(
+        name="ivan.basic",
+        items=expected_items
+    )

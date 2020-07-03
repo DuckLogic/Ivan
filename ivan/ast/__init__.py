@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import re
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional, Callable, Union, Dict, Tuple
@@ -13,10 +14,26 @@ __all__ = [
     # AST Items
     "PrimaryItem", "InterfaceDef", "FunctionDeclaration", "OpaqueTypeDef",
     # AST Nodes
-    "FunctionArg", "Annotation", "AnnotationValue", "FunctionSignature"
+    "FunctionArg", "Annotation", "AnnotationValue", "IvanModule",
+    # Misc
+    "FunctionSignature",
 ]
 
 AnnotationValue = Union[str, int, bool, Tuple[str]]
+
+
+VALID_MODULE_NAME_PATTERN = re.compile(r'^([\w.])+$')
+
+
+@dataclass(frozen=True)
+class IvanModule:
+    """The definition of an ivan module"""
+    name: str
+    items: List[PrimaryItem]
+
+    def __post_init__(self):
+        if not VALID_MODULE_NAME_PATTERN.match(self.name):
+            raise ValueError(f"Invalid module name: {self.name!r}")
 
 
 @dataclass(frozen=True)
@@ -64,7 +81,7 @@ class PrimaryItem(metaclass=ABCMeta):
     def visit(self, visitor: AstVisitor) -> Optional[PrimaryItem]:
         pass
 
-    def update_types(self, updater: Callable[[IvanType], IvanType]) -> PrimaryItem:
+    def replace_types(self, updater: Callable[[IvanType], IvanType]) -> PrimaryItem:
         updated = self.visit(TypeUpdater(updater))
         if updated is not None:
             return updated
