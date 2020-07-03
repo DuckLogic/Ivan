@@ -135,10 +135,13 @@ def parse_doc_string(parser: Parser) -> Optional[DocString]:
 
 
 def parse_annotation_value(parser: Parser) -> AnnotationValue:
-    token = parser.peek()
+    token = parser.pop()
     if token.token_type == TokenType.STRING_LITERAL:
-        parser.pop()
         return token.value
+    elif token.is_keyword('true'):
+        return True
+    elif token.is_keyword('false'):
+        return False
     else:
         raise ParseException("Expected annotation value", token.span)
 

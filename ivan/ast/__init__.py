@@ -16,7 +16,7 @@ __all__ = [
     "FunctionArg", "Annotation", "AnnotationValue", "FunctionSignature"
 ]
 
-AnnotationValue = Union[str, int, Tuple[str]]
+AnnotationValue = Union[str, int, bool, Tuple[str]]
 
 
 @dataclass(frozen=True)

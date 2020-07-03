@@ -12,7 +12,8 @@ class Span:
 
 
 VALID_SYMBOLS = {"{", "}", ":", ";", ",", "&", "*", '@', '=', "(", ")"}
-VALID_KEYWORDS = {"Self", "self", "interface", "fun", "raw", "mut", "own", "opaque", "type"}
+VALID_KEYWORDS = {"Self", "self", "interface", "fun", "raw", "mut", "own", "opaque", "type",
+                  "true", "false"}
 
 
 class TokenType(Enum):

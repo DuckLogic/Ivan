@@ -41,10 +41,11 @@ def test_parse_annotation():
         values=None,
         span=Span(1, 1)
     )
-    assert parse_annotation(Parser.parse_str('@Test(key="value")')) == Annotation(
+    assert parse_annotation(Parser.parse_str('@Test(key="value", b=false)')) == Annotation(
         name="Test",
         values={
-            "key": "value"
+            "key": "value",
+            "b": False
         },
         span=Span(1, 1)
     )
