@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, Union, Dict, Tuple
 
 from .lexer import Span
 from ..types import IvanType
@@ -13,8 +13,17 @@ __all__ = [
     # AST Items
     "PrimaryItem", "InterfaceDef", "FunctionDeclaration", "OpaqueTypeDef",
     # AST Nodes
-    "FunctionArg"
+    "FunctionArg", "Annotation", "AnnotationValue", "FunctionSignature"
 ]
+
+AnnotationValue = Union[str, int, Tuple[str]]
+
+
+@dataclass(frozen=True)
+class Annotation:
+    name: str
+    values: Optional[Dict[str, AnnotationValue]]
+    span: Span
 
 
 @dataclass
@@ -37,8 +46,9 @@ class DocString:
     def print_like_rust(self) -> List[str]:
         return [f"/// {line}" if line else "///" for line in self.lines]
 
-    def __bool__(self):
-        return self.lines != []
+    def __len__(self):
+        return len(self.lines)
+
 
 @dataclass(frozen=True)
 class PrimaryItem(metaclass=ABCMeta):
@@ -47,6 +57,7 @@ class PrimaryItem(metaclass=ABCMeta):
     span: Span
     """The span where this item was defined"""
     doc_string: Optional[DocString]
+    annotations: List[Annotation]
     """The documentation for this item"""
 
     @abstractmethod

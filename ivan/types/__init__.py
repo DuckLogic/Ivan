@@ -2,18 +2,6 @@ from abc import ABCMeta, abstractmethod
 from enum import Enum
 from typing import Optional
 
-from ivan.ast.lexer import Span
-
-
-class UnresolvedTypeException(Exception):
-    name: str
-    span: Span
-
-    def __init__(self, name: str, span: Span):
-        super().__init__(f"Unresolved type {name!r}")
-        self.name = name
-        self.span = span
-
 
 class IvanType(metaclass=ABCMeta):
     """Base class for the internal type system"""
@@ -49,30 +37,6 @@ class IvanType(metaclass=ABCMeta):
     @abstractmethod
     def __repr__(self):
         pass
-
-
-class UnresolvedTypeRef(IvanType):
-    """A named type which hasn't been resolved"""
-    usage_span: Span
-    """The span where this type is referenced"""
-
-    def __init__(self, name: str, usage_span: Span):
-        super().__init__(name)
-        self.usage_span = usage_span
-
-    def print_c11(self) -> str:
-        raise UnresolvedTypeException(self.name, self.usage_span)
-
-    def print_rust(self) -> str:
-        raise UnresolvedTypeException(self.name, self.usage_span)
-
-    def __eq__(self, other):
-        return isinstance(other, UnresolvedTypeRef)\
-               and other.name == self.name\
-               and other.usage_span == self.usage_span
-
-    def __repr__(self):
-        return f"UnresolvedType({self.name}, {self.usage_span!r})"
 
 
 class ReferenceKind(Enum):

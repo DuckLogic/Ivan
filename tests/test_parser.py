@@ -1,10 +1,12 @@
 from pathlib import Path
 
 from ivan import types
-from ivan.ast import FunctionDeclaration, DocString, InterfaceDef, FunctionArg, OpaqueTypeDef, FunctionSignature
+from ivan.ast import FunctionDeclaration, DocString, InterfaceDef, FunctionArg, OpaqueTypeDef, FunctionSignature, \
+    Annotation
 from ivan.ast.lexer import Span
-from ivan.ast.parser import parse_item, parse_all, Parser
-from ivan.types import ReferenceType, ReferenceKind, UnresolvedTypeRef, FixedIntegerType
+from ivan.ast.parser import parse_item, parse_all, Parser, parse_annotation
+from ivan.types import ReferenceType, ReferenceKind, FixedIntegerType
+from ivan.types.context import UnresolvedTypeRef
 
 
 def test_parse_func():
@@ -28,7 +30,23 @@ def test_parse_func():
             ],
             return_type=types.UNIT,
         ),
+        annotations=[],
         span=Span(6, 8)
+    )
+
+
+def test_parse_annotation():
+    assert parse_annotation(Parser.parse_str("@Example")) == Annotation(
+        name="Example",
+        values=None,
+        span=Span(1, 1)
+    )
+    assert parse_annotation(Parser.parse_str('@Test(key="value")')) == Annotation(
+        name="Test",
+        values={
+            "key": "value"
+        },
+        span=Span(1, 1)
     )
 
 
@@ -51,7 +69,8 @@ def test_parse_basic():
                         args=[],
                         return_type=FixedIntegerType(bits=64, signed=True),
                     ),
-                    span=Span(5, 8)
+                    annotations=[],
+                    span=Span(6, 8)
                 ),
                 FunctionDeclaration(
                     name="findInBytes",
@@ -64,8 +83,9 @@ def test_parse_basic():
                          "The output (if any) is placed in `result`.",
                          "It's a `&mut` pointer, so it's expected to be mutable",
                          "and have no-aliasing for the duration of the call."],
-                        span=Span(6, 4)
+                        span=Span(7, 4),
                     ),
+                    annotations=[],
                     signature=FunctionSignature(
                         args=[
                             FunctionArg("bytes", ReferenceType(
@@ -80,7 +100,7 @@ def test_parse_basic():
                         ],
                         return_type=types.BOOLEAN,
                     ),
-                    span=Span(16, 8)
+                    span=Span(17, 8)
                 ),
                 FunctionDeclaration(
                     name="complexLifetime",
@@ -92,10 +112,26 @@ def test_parse_basic():
                             kind=ReferenceKind.RAW
                         ),
                     ),
-                    span=Span(19, 8)
+                    annotations=[
+                        Annotation(
+                            name="NestedAnnotation",
+                            values=None,
+                            span=Span(20, 5)
+                        )
+                    ],
+                    span=Span(21, 8)
                 ),
             ],
-            span=Span(4, 10)
+            span=Span(5, 10),
+            annotations=[
+                Annotation(
+                    name="GenerateWrappers",
+                    values={
+                        "prefix": "basic"
+                    },
+                    span=Span(4, 1)
+                )
+            ]
         ),
         InterfaceDef(
             name="Other",
@@ -103,7 +139,7 @@ def test_parse_basic():
                 ["Here is another interface",
                  "",
                  "You can have multiple ones defined"],
-                Span(22, 0)
+                Span(24, 0)
             ),
             methods=[
                 FunctionDeclaration(
@@ -115,24 +151,36 @@ def test_parse_basic():
                         ],
                         return_type=types.UNIT,
                     ),
-                    span=Span(28, 8)
+                    span=Span(31, 8),
+                    annotations=[]
                 )
             ],
-            span=Span(27, 10)
+            span=Span(30, 10),
+            annotations=[
+                Annotation(
+                    name="GenerateWrappers",
+                    values={
+                        "prefix": "other"
+                    },
+                    span=Span(29, 1)
+                )
+            ]
         ),
         InterfaceDef(
             name="NoMethods",
             doc_string=None,
             methods=[],
-            span=Span(32, 10)
+            span=Span(35, 10),
+            annotations=[]
         ),
         OpaqueTypeDef(
             name="Example",
             doc_string=DocString(
                 ["A type defined elsewhere in user code"],
-                span=Span(36, 0)
+                span=Span(39, 0)
             ),
-            span=Span(39, 12)
+            span=Span(42, 12),
+            annotations=[]
         ),
         FunctionDeclaration(
             name="topLevel",
@@ -141,12 +189,13 @@ def test_parse_basic():
                 args=[
                     FunctionArg("e", UnresolvedTypeRef(
                         "Example",
-                        usage_span=Span(41, 16)
+                        usage_span=Span(44, 16)
                     ))
                 ],
                 return_type=types.UNIT,
             ),
-            span=Span(41, 4)
+            span=Span(44, 4),
+            annotations=[]
         )
     ]
     assert parsed == expected

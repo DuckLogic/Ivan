@@ -11,7 +11,7 @@ class Span:
     column: int
 
 
-VALID_SYMBOLS = {"{", "}", ":", ";", ",", "&", "*", '@', "(", ")"}
+VALID_SYMBOLS = {"{", "}", ":", ";", ",", "&", "*", '@', '=', "(", ")"}
 VALID_KEYWORDS = {"Self", "self", "interface", "fun", "raw", "mut", "own", "opaque", "type"}
 
 

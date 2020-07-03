@@ -1,6 +1,7 @@
 /**
  * This is a basic example of an ivan interface.
  */
+@GenerateWrappers(prefix="basic")
 interface Basic {
     fun noArgs(): i64;
     /**
@@ -16,6 +17,7 @@ interface Basic {
     fun findInBytes(bytes: &byte, start: usize, result: &mut usize): bool;
 
     // This lifetime is too complex to be given anything but a 'raw' pointer
+    @NestedAnnotation
     fun complexLifetime(): &raw byte;
 }
 
@@ -24,6 +26,7 @@ interface Basic {
  *
  * You can have multiple ones defined
  */
+@GenerateWrappers(prefix="other")
 interface Other {
     fun test(d: double);
 }

@@ -1,11 +1,13 @@
+import dataclasses
 import re
 from typing import List, Optional
 
 from ivan import types
 from ivan.ast import lexer, DocString, OpaqueTypeDef, InterfaceDef, FunctionDeclaration, FunctionArg, PrimaryItem, \
-    FunctionSignature
+    FunctionSignature, Annotation, AnnotationValue
 from ivan.ast.lexer import Token, Span, ParseException, TokenType
-from ivan.types import ReferenceKind, ReferenceType, PrimitiveType, FixedIntegerType, UnresolvedTypeRef, IvanType
+from ivan.types import ReferenceKind, ReferenceType, PrimitiveType, FixedIntegerType, IvanType
+from ivan.types.context import UnresolvedTypeRef
 
 
 class Parser:
@@ -27,6 +29,13 @@ class Parser:
             return self.tokens[self.index].span
         except IndexError:
             return self.last_span
+
+    def look(self, ahead: int) -> Optional[Token]:
+        assert ahead >= 0
+        try:
+            return self.tokens[self.index + ahead]
+        except IndexError:
+            return None
 
     def peek(self) -> Optional[Token]:
         try:
@@ -89,6 +98,18 @@ class Parser:
     def __repr__(self):
         return f"Parser(index={self.index}, tokens={self.tokens})"
 
+    def __len__(self):
+        # NOTE: Guard against negative len just in case
+        return max(0, len(self.tokens) - self.index)
+
+
+@dataclasses.dataclass
+class ItemHeader:
+    """The data that typically comes before an item"""
+    span: Span
+    doc_string: Optional[DocString] = None
+    annotations: List[Annotation] = dataclasses.field(default_factory=list)
+
 
 def parse_doc_string(parser: Parser) -> Optional[DocString]:
     token = parser.peek()
@@ -113,7 +134,49 @@ def parse_doc_string(parser: Parser) -> Optional[DocString]:
     return DocString(lines=doc_lines, span=token.span)
 
 
-def parse_opaque_type(parser: Parser, doc_string: Optional[DocString]) -> OpaqueTypeDef:
+def parse_annotation_value(parser: Parser) -> AnnotationValue:
+    token = parser.peek()
+    if token.token_type == TokenType.STRING_LITERAL:
+        parser.pop()
+        return token.value
+    else:
+        raise ParseException("Expected annotation value", token.span)
+
+
+def parse_annotation(parser: Parser) -> Annotation:
+    parser.expect_symbol('@')
+    start_span = parser.current_span
+    name = parser.expect_identifier()
+    if parser and parser.peek().is_symbol('('):
+        values = {}
+        parser.expect_symbol('(')
+        while True:
+            token = parser.peek()
+            if token is None:
+                raise ParseException(f"Expected closing paren for annotation", start_span)
+            elif token.token_type == TokenType.IDENTIFIER:
+                value_name = token.value
+                parser.pop()
+                if value_name in values:
+                    raise ParseException(
+                        f"Duplicate annotation values for {value_name!r} in @{name}",
+                        token.span
+                    )
+                parser.expect_symbol('=')
+                values[value_name] = parse_annotation_value(parser)
+            elif token.is_symbol(','):
+                parser.pop()
+                continue
+            elif token.is_symbol(')'):
+                parser.pop()
+                break
+            else:
+                raise ParseException(f"Unexpected token {token.value!r}", token.span)
+        return Annotation(name=name, values=values, span=start_span)
+    else:
+        return Annotation(name, values=None, span=start_span)
+
+def parse_opaque_type(parser: Parser, header: ItemHeader) -> OpaqueTypeDef:
     parser.expect_keyword("opaque")
     parser.expect_keyword("type")
     start_span = parser.current_span
@@ -122,54 +185,59 @@ def parse_opaque_type(parser: Parser, doc_string: Optional[DocString]) -> Opaque
     return OpaqueTypeDef(
         name=name,
         span=start_span,
-        doc_string=doc_string
+        doc_string=header.doc_string,
+        annotations=header.annotations
     )
 
 
-def parse_interface(parser: Parser, doc_string: Optional[DocString]) -> InterfaceDef:
+def parse_interface(parser: Parser, header: ItemHeader) -> InterfaceDef:
     parser.expect_keyword("interface")
     start_span = parser.current_span
     name = parser.expect_identifier()
     parser.expect_symbol('{')
     methods = []
-    pending_comment: Optional[DocString] = None
+    pending_header: Optional[ItemHeader] = None
     while True:
         token = parser.peek()
         if token is None:
             raise ParseException(f"Expected closing brace for {name}", start_span)
-        elif token.token_type == TokenType.DOC_COMMENT:
-            if pending_comment is not None:
+        elif token.token_type == TokenType.DOC_COMMENT or token.is_symbol('@'):
+            if pending_header is not None:
                 raise ParseException(
-                    f"Already encountered doc comment @ {pending_comment.span.line}",
+                    f"Already encountered header @ {pending_header.span.line}",
                     token.span
                 )
-            pending_comment = parse_doc_string(parser)
-            assert pending_comment is not None
+            pending_header = parse_item_header(parser)
+            assert pending_header is not None
         elif token.is_keyword('fun'):
-            methods.append(parse_function_declaration(parser, pending_comment))
-            pending_comment = None
+            if pending_header is None:
+                pending_header = ItemHeader(span=parser.current_span)
+            methods.append(parse_function_declaration(parser, pending_header))
+            pending_header = None
         elif token.is_symbol('}'):
             parser.pop()
             # End of interface
-            if pending_comment is not None:
-                raise ParseException("Unexpected doc comment", pending_comment.span)
+            if pending_header is not None:
+                raise ParseException("Unexpected item header", pending_header.span)
             return InterfaceDef(
                 name=name,
                 methods=methods,
-                doc_string=doc_string,
-                span=start_span
+                doc_string=header.doc_string,
+                span=start_span,
+                annotations=header.annotations
             )
         else:
             raise ParseException("Unexpected token", token.span)
 
 
 def parse_function_signature(parser: Parser) -> FunctionSignature:
+    start_span = parser.current_span
     parser.expect_symbol('(')
     args = []
     while True:
         token = parser.peek()
         if token is None:
-            raise ParseException(f"Expected closing brace for {func_name}", start_span)
+            raise ParseException(f"Expected closing brace", start_span)
         elif token.token_type == TokenType.IDENTIFIER:
             arg_name = parser.expect_identifier()
             parser.expect_symbol(':')
@@ -181,7 +249,10 @@ def parse_function_signature(parser: Parser) -> FunctionSignature:
             elif trailing.is_symbol(')'):
                 break  # we're done
             else:
-                raise ParseException(f"Unexpected token {trailing.value!r}")
+                raise ParseException(
+                    f"Unexpected token {trailing.value!r}",
+                    trailing.span
+                )
         elif token.is_symbol(')'):
             parser.pop()
             break  # stop parsing args
@@ -198,7 +269,7 @@ def parse_function_signature(parser: Parser) -> FunctionSignature:
     return FunctionSignature(return_type=return_type, args=args)
 
 
-def parse_function_declaration(parser: Parser, doc_string: Optional[DocString]) -> FunctionDeclaration:
+def parse_function_declaration(parser: Parser, header: ItemHeader) -> FunctionDeclaration:
     parser.expect_keyword("fun")
     start_span = parser.current_span
     func_name = parser.expect_identifier()
@@ -207,8 +278,9 @@ def parse_function_declaration(parser: Parser, doc_string: Optional[DocString]) 
     return FunctionDeclaration(
         name=func_name,
         span=start_span,
-        doc_string=doc_string,
-        signature=signature
+        doc_string=header.doc_string,
+        signature=signature,
+        annotations=header.annotations
     )
 
 
@@ -268,24 +340,29 @@ def parse_type(parser: Parser) -> IvanType:
     return UnresolvedTypeRef(type_name, usage_span=ident_token.span)
 
 
-def parse_item(parser: Parser, doc_string: Optional[DocString] = None) -> PrimaryItem:
+def parse_item_header(parser: Parser) -> ItemHeader:
+    header = ItemHeader(span=parser.current_span)
+    if parser and parser.peek().token_type == TokenType.DOC_COMMENT:
+        doc_string = parse_doc_string(parser)
+        assert doc_string is not None
+        header.doc_string = doc_string
+    while parser and parser.peek().is_symbol('@'):
+        header.annotations.append(parse_annotation(parser))
+    return header
+
+def parse_item(parser: Parser) -> PrimaryItem:
+    header = parse_item_header(parser)
     token = parser.peek()
     if token is None:
         raise ParseException("Unexpected EOF: Expected item", parser.current_span)
-    if token.token_type == TokenType.DOC_COMMENT:
-        if doc_string is not None:
-            raise ParseException("Multiple doc comments", token.span)
-        doc_string = parse_doc_string(parser)
-        assert doc_string is not None
-        return parse_item(parser, doc_string=doc_string)
     elif token.is_keyword('fun'):
-        return parse_function_declaration(parser, doc_string=doc_string)
+        return parse_function_declaration(parser, header)
     elif token.is_keyword('interface'):
-        return parse_interface(parser, doc_string=doc_string)
+        return parse_interface(parser, header)
     elif token.is_keyword('opaque'):
-        return parse_opaque_type(parser, doc_string=doc_string)
+        return parse_opaque_type(parser, header)
     else:
-        raise ParseException("Expected item", token.span)
+        raise ParseException(f"Expected item but got {token.value!r}", token.span)
 
 
 def parse_all(parser: Parser) -> List[PrimaryItem]:
