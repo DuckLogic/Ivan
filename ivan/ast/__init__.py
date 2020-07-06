@@ -6,6 +6,7 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional, Callable, Union, Dict, Tuple
 
+from .expr import IvanStatement
 from .lexer import Span
 from ..types import IvanType
 
@@ -109,8 +110,17 @@ class FunctionSignature:
 
 
 @dataclass(frozen=True)
+class FunctionBody:
+    default: bool
+    """If this is declared as a default implementation"""
+    statements: List[IvanStatement]
+
+
+@dataclass(frozen=True)
 class FunctionDeclaration(PrimaryItem):
     signature: FunctionSignature
+    body: Optional[FunctionBody]
+    """The body of this function, or None if its an abstract definition"""
 
     def visit(self, visitor: AstVisitor) -> Optional[FunctionDeclaration]:
         return visitor.visit_function_declaration(self)
