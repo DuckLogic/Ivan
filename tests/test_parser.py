@@ -19,7 +19,7 @@ def test_parse_types():
 
 def test_parse_func():
     assert parse_item(Parser.parse_str(
-"""/**
+        """/**
      * Does some things
      *
      * On occasion
@@ -39,7 +39,8 @@ def test_parse_func():
             return_type=types.UNIT,
         ),
         annotations=[],
-        span=Span(6, 8)
+        span=Span(6, 8),
+        body=None
     )
 
 
@@ -79,7 +80,8 @@ def test_parse_basic():
                         return_type=FixedIntegerType(bits=64, signed=True),
                     ),
                     annotations=[],
-                    span=Span(6, 8)
+                    span=Span(6, 8),
+                    body=None
                 ),
                 FunctionDeclaration(
                     name="findInBytes",
@@ -109,7 +111,8 @@ def test_parse_basic():
                         ],
                         return_type=types.BOOLEAN,
                     ),
-                    span=Span(17, 8)
+                    span=Span(17, 8),
+                    body=None
                 ),
                 FunctionDeclaration(
                     name="complexLifetime",
@@ -128,7 +131,8 @@ def test_parse_basic():
                             span=Span(20, 5)
                         )
                     ],
-                    span=Span(21, 8)
+                    span=Span(21, 8),
+                    body=None
                 ),
             ],
             span=Span(5, 10),
@@ -139,7 +143,7 @@ def test_parse_basic():
                         "prefix": "basic",
                         "include_doc": False
                     },
-                    span=Span(4, 1)
+                    span=Span(4, 1),
                 )
             ]
         ),
@@ -162,7 +166,8 @@ def test_parse_basic():
                         return_type=types.UNIT,
                     ),
                     span=Span(31, 8),
-                    annotations=[]
+                    annotations=[],
+                    body=None
                 )
             ],
             span=Span(30, 10),
@@ -206,7 +211,8 @@ def test_parse_basic():
                 return_type=types.UNIT,
             ),
             span=Span(44, 4),
-            annotations=[]
+            annotations=[],
+            body=None
         )
     ]
     assert parsed == IvanModule(

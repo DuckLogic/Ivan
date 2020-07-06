@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <assert.h>
 
 /**
  * This is a basic example of an ivan interface.
@@ -46,19 +47,27 @@ void topLevel(Example e);
 // wrappers
 
 int64_t basic_noArgs(const Basic* vtable) {
-    return vtable->noArgs();
+    int64_t (*func_ptr)() = vtable->noArgs;
+    assert(func_ptr != NULL);
+    return (*func_ptr)();
 }
 
 bool basic_findInBytes(const Basic* vtable, const char* bytes, size_t start, size_t* result) {
-    return vtable->findInBytes(bytes, start, result);
+    bool (*func_ptr)(const char* bytes, size_t start, size_t* result) = vtable->findInBytes;
+    assert(func_ptr != NULL);
+    return (*func_ptr)(bytes, start, result);
 }
 
 char* basic_complexLifetime(const Basic* vtable) {
-    return vtable->complexLifetime();
+    char* (*func_ptr)() = vtable->complexLifetime;
+    assert(func_ptr != NULL);
+    return (*func_ptr)();
 }
 
 void other_test(Other vtable, double d) {
-    vtable.test(d);
+    void (*func_ptr)(double d) = vtable.test;
+    assert(func_ptr != NULL);
+    (*func_ptr)(d);
 }
 
 #endif /* IVAN_BASIC_H */

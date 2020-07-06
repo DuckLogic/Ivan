@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from dataclasses import dataclass
 from typing import Optional
 
 from ivan.ast.lexer import Span
 
 
+@dataclass(frozen=True)
 class IvanStatement(metaclass=ABCMeta):
     """A statement"""
     span: Span
@@ -15,6 +17,7 @@ class IvanStatement(metaclass=ABCMeta):
         pass
 
 
+@dataclass(frozen=True)
 class ReturnStatement(IvanStatement):
     value: Optional[IvanExpr]
 
@@ -22,11 +25,13 @@ class ReturnStatement(IvanStatement):
         return visitor.visit_return(self)
 
 
+@dataclass(frozen=True)
 class IvanExpr:
     """An expression"""
     span: Span
 
 
+@dataclass(frozen=True)
 class NullExpr(IvanExpr):
     """A null pointer expression"""
     pass

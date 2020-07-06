@@ -111,9 +111,10 @@ class FunctionSignature:
 
 @dataclass(frozen=True)
 class FunctionBody:
-    default: bool
+    span: Span
     """If this is declared as a default implementation"""
     statements: List[IvanStatement]
+    default: bool
 
 
 @dataclass(frozen=True)

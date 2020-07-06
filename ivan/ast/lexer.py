@@ -13,7 +13,7 @@ class Span:
 
 VALID_SYMBOLS = {"{", "}", ":", ";", ",", "&", "*", '@', '=', "(", ")"}
 VALID_KEYWORDS = {"Self", "self", "interface", "fun", "raw", "mut", "own", "opaque", "type",
-                  "true", "false", "opt", "field", "default"}
+                  "true", "false", "opt", "field", "default", "null", "return"}
 
 
 class TokenType(Enum):
@@ -90,7 +90,7 @@ def lex_next(lexer: "Lexer") -> Optional[Token]:
                 start_span
             )
         else:
-            raise ParseException(f"Unexpected char: {c}", lexer.span)
+            raise ParseException(f"Unexpected char: {c}", lexer.span())
     elif c == '"':
         start_span = lexer.span()
         lexer.skip_text('"')

@@ -26,3 +26,23 @@ def test_basic_c11_codegen():
     generator.write_footer()
     actual_generated_text = str(generator)
     assert generated_text == actual_generated_text
+
+def test_shape_c11_codegen():
+    with open(Path(Path(__file__).parent, "shape.ivan"), "rt") as f:
+        basic_text = f.read()
+    with open(Path(Path(__file__).parent, "shape_generated.h"), "rt") as f:
+        generated_text = f.read()
+    parsed = parse_module(Parser.parse_str(basic_text), name="ducklogic.shape")
+    context = TypeContext.build_context(parsed)
+    generator = C11CodeGenerator(module=parsed, context=context)
+    generator.write_header()
+    generator.declare_types()
+
+    generator.writeln("// wrappers")
+    generator.writeln()
+
+    generator.generate_wrappers()
+
+    generator.write_footer()
+    actual_generated_text = str(generator)
+    assert generated_text == actual_generated_text

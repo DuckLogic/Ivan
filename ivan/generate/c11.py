@@ -4,7 +4,8 @@ from typing import Sequence, Optional
 
 from ivan import types
 from ivan.ast import OpaqueTypeDef, InterfaceDef, FunctionDeclaration, FunctionSignature, FunctionArg, \
-    DocString
+    DocString, FunctionBody
+from ivan.compiler import C11Compiler
 from ivan.generate import CodeWriter, CodeGenerator
 from ivan.types import IvanType, ReferenceType, ReferenceKind
 
@@ -19,7 +20,7 @@ class C11CodeGenerator(CodeGenerator):
         self.writeln(f"#ifndef {self.header_name}")
         self.writeln(f"#define {self.header_name}")
         self.writeln()
-        std_imports = ["<stdint.h>", "<stdbool.h>", "<stdlib.h>"]
+        std_imports = ["<stdint.h>", "<stdbool.h>", "<stdlib.h>", "<assert.h>"]
         global_imports = []
         local_imports = []
         for header in imports:
@@ -88,6 +89,7 @@ class C11CodeGenerator(CodeGenerator):
             self, wrapper_name: str, interface_type: IvanType,
             target_method: FunctionDeclaration,
             doc_string: Optional[DocString],
+            default_impl: Optional[FunctionBody],
             indirect_vtable: bool
     ):
         """Generate a wrapper method for the specified interface"""
@@ -103,14 +105,34 @@ class C11CodeGenerator(CodeGenerator):
         ))
         self.writeln(' {')
         with self.with_indent() as writer:
-            if target_method.signature.return_type != types.UNIT:
-                writer.write("return ")
+            self.declare_function_pointer('func_ptr', target_method.signature)
+            writer.write(' = ')
             if indirect_vtable:
                 writer.write('vtable->')
             else:
                 writer.write('vtable.')
             writer.write(target_method.name)
-            writer.write('(')
-            writer.write(', '.join(f"{arg.arg_name}" for arg in target_method.signature.args))
-            writer.writeln(');')
+            writer.writeln(';')
+
+            def call_vtable():
+                if target_method.signature.return_type != types.UNIT:
+                    writer.write("return ")
+                writer.write('(*func_ptr)(')
+                writer.write(', '.join(f"{arg.arg_name}" for arg in target_method.signature.args))
+                writer.writeln(');')
+            if default_impl is None:
+                writer.writeln('assert(func_ptr != NULL);')
+                call_vtable()
+            else:
+                writer.writeln("if (func_ptr == NULL) {")
+                with self.with_indent():
+                    compiler = C11Compiler(
+                        writer=self,
+                        func_signature=target_method.signature
+                    )
+                    compiler.compile_body(default_impl)
+                writer.writeln("} else {")
+                with self.with_indent():
+                    call_vtable()
+                writer.writeln("}")
         self.writeln('}')

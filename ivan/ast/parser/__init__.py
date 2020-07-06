@@ -1,10 +1,10 @@
 import dataclasses
 import re
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from ivan import types
 from ivan.ast import lexer, DocString, OpaqueTypeDef, InterfaceDef, FunctionDeclaration, FunctionArg, PrimaryItem, \
-    FunctionSignature, Annotation, AnnotationValue, IvanModule
+    FunctionSignature, Annotation, AnnotationValue, IvanModule, FunctionBody
 from ivan.ast.lexer import Token, Span, ParseException, TokenType
 from ivan.types import ReferenceKind, ReferenceType, PrimitiveType, FixedIntegerType, IvanType
 from ivan.types.context import UnresolvedTypeRef
@@ -103,12 +103,28 @@ class Parser:
         return max(0, len(self.tokens) - self.index)
 
 
+ALLOWED_FUNCTION_MODIFIERS = {"default", }
+ALLOWED_TYPE_MODIFIERS = set()
+
+
 @dataclasses.dataclass
 class ItemHeader:
     """The data that typically comes before an item"""
     span: Span
     doc_string: Optional[DocString] = None
     annotations: List[Annotation] = dataclasses.field(default_factory=list)
+    modifiers: Set[str] = dataclasses.field(default_factory=set)
+
+    def _check_modifiers(self, allowed: Set[str], span: Span):
+        unexpected = self.modifiers - allowed
+        if unexpected:
+            raise ParseException(f"Unexpected modifiers: {unexpected}", span)
+
+    def expect_type_header(self, span: Span):
+        self._check_modifiers(ALLOWED_TYPE_MODIFIERS, span)
+
+    def expect_function_definition(self, span: Span):
+        self._check_modifiers(ALLOWED_FUNCTION_MODIFIERS, span)
 
 
 def parse_doc_string(parser: Parser) -> Optional[DocString]:
@@ -179,7 +195,9 @@ def parse_annotation(parser: Parser) -> Annotation:
     else:
         return Annotation(name, values=None, span=start_span)
 
+
 def parse_opaque_type(parser: Parser, header: ItemHeader) -> OpaqueTypeDef:
+    header.expect_type_header(parser.current_span)
     parser.expect_keyword("opaque")
     parser.expect_keyword("type")
     start_span = parser.current_span
@@ -194,6 +212,7 @@ def parse_opaque_type(parser: Parser, header: ItemHeader) -> OpaqueTypeDef:
 
 
 def parse_interface(parser: Parser, header: ItemHeader) -> InterfaceDef:
+    header.expect_type_header(parser.current_span)
     parser.expect_keyword("interface")
     start_span = parser.current_span
     name = parser.expect_identifier()
@@ -204,7 +223,9 @@ def parse_interface(parser: Parser, header: ItemHeader) -> InterfaceDef:
         token = parser.peek()
         if token is None:
             raise ParseException(f"Expected closing brace for {name}", start_span)
-        elif token.token_type == TokenType.DOC_COMMENT or token.is_symbol('@'):
+        elif token.token_type == TokenType.DOC_COMMENT \
+                or token.is_symbol('@')\
+                or token.is_keyword('default'):
             if pending_header is not None:
                 raise ParseException(
                     f"Already encountered header @ {pending_header.span.line}",
@@ -272,18 +293,51 @@ def parse_function_signature(parser: Parser) -> FunctionSignature:
     return FunctionSignature(return_type=return_type, args=args)
 
 
+def parse_function_body(parser: Parser, is_default: bool) -> FunctionBody:
+    start_body_span = parser.current_span
+    parser.expect_symbol('{')
+    statements = []
+    while True:
+        token = parser.peek()
+        if not token:
+            raise ParseException(
+                "Expected closing brace for func body",
+                span=start_body_span
+            )
+        elif token.is_symbol('}'):
+            parser.pop()
+            return FunctionBody(
+                statements=statements,
+                span=start_body_span,
+                default=is_default
+            )
+        else:
+            statements.append(parse_statement(parser))
+
+
 def parse_function_declaration(parser: Parser, header: ItemHeader) -> FunctionDeclaration:
+    header.expect_function_definition(parser.current_span)
     parser.expect_keyword("fun")
     start_span = parser.current_span
     func_name = parser.expect_identifier()
     signature = parse_function_signature(parser)
-    parser.expect_symbol(';')
+    is_default = 'default' in header.modifiers
+    if parser.peek().is_symbol(';'):
+        parser.pop()
+        body = None
+    elif parser.peek().is_symbol('{'):
+        body = parse_function_body(parser, is_default=True)
+    else:
+        raise ParseException(f"Unexpected symbol", parser.current_span)
+    if is_default and body is None:
+        raise ParseException(f"Default function mast have body!", start_span)
     return FunctionDeclaration(
         name=func_name,
         span=start_span,
         doc_string=header.doc_string,
         signature=signature,
-        annotations=header.annotations
+        annotations=header.annotations,
+        body=body
     )
 
 
@@ -364,7 +418,11 @@ def parse_item_header(parser: Parser) -> ItemHeader:
         header.doc_string = doc_string
     while parser and parser.peek().is_symbol('@'):
         header.annotations.append(parse_annotation(parser))
+    if parser and parser.peek().is_keyword('default'):
+        parser.pop()
+        header.is_default = True
     return header
+
 
 def parse_item(parser: Parser) -> PrimaryItem:
     header = parse_item_header(parser)
@@ -389,3 +447,7 @@ def parse_module(parser: Parser, name: str) -> IvanModule:
         items=items,
         name=name
     )
+
+
+# Must come at end?
+from ivan.ast.parser.expr import parse_statement

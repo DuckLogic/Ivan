@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 from typing import ContextManager, Optional, Iterable, List
 
-from ivan.ast import IvanModule, OpaqueTypeDef, InterfaceDef, FunctionDeclaration, DocString
+from ivan.ast import IvanModule, OpaqueTypeDef, InterfaceDef, FunctionDeclaration, DocString, FunctionBody
 from ivan.types import IvanType
 from ivan.types.context import TypeContext
 
@@ -163,9 +163,16 @@ class CodeGenerator(CodeWriter, metaclass=ABCMeta):
                     )
                 else:
                     doc_string = None
+                # TODO: These joined ifs seem to make IntellIJ thhink `method.body` is None from here on out
+                if method.body is not None and not method.body.default:
+                    raise CodegenException(
+                        f"Method must be default: "
+                        f"{target_interface.name}.{method.name}"
+                    )
                 self._write_wrapper_method(
                     wrapper_name=wrapper_name, indirect_vtable=indirect_vtable,
                     target_method=method, interface_type=interface_type,
+                    default_impl=method.body,
                     doc_string=doc_string
                 )
                 self.writeln()  # Trailing whitespace
@@ -176,6 +183,7 @@ class CodeGenerator(CodeWriter, metaclass=ABCMeta):
             self, wrapper_name: str, interface_type: IvanType,
             target_method: FunctionDeclaration,
             doc_string: Optional[DocString],
+            default_impl: Optional[FunctionBody],
             indirect_vtable: bool
     ):
         pass
