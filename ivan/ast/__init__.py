@@ -75,8 +75,8 @@ class PrimaryItem(metaclass=ABCMeta):
     span: Span
     """The span where this item was defined"""
     doc_string: Optional[DocString]
-    annotations: List[Annotation]
     """The documentation for this item"""
+    annotations: List[Annotation]
 
     @abstractmethod
     def visit(self, visitor: AstVisitor) -> Optional[PrimaryItem]:
@@ -95,6 +95,23 @@ class PrimaryItem(metaclass=ABCMeta):
             if annotation.name == name:
                 return annotation
         return None
+
+
+@dataclass(frozen=True)
+class TypeMember(metaclass=ABCMeta):
+    """The member of a type"""
+    name: str
+    span: Span
+    """The span where this item was defined"""
+    doc_string: Optional[DocString]
+    """The documentation for this item"""
+    annotations: List[Annotation]
+
+
+@dataclass(frozen=True)
+class FieldDef(TypeMember):
+    static_type: IvanType
+    """The type of the field"""
 
 
 @dataclass(frozen=True)
@@ -118,7 +135,7 @@ class FunctionBody:
 
 
 @dataclass(frozen=True)
-class FunctionDeclaration(PrimaryItem):
+class FunctionDeclaration(PrimaryItem, TypeMember):
     signature: FunctionSignature
     body: Optional[FunctionBody]
     """The body of this function, or None if its an abstract definition"""
@@ -130,11 +147,19 @@ class FunctionDeclaration(PrimaryItem):
 @dataclass(frozen=True)
 class InterfaceDef(PrimaryItem):
     """The definition of an interface"""
+    fields: List[FieldDef]
     methods: List[FunctionDeclaration]
-    span: Span
 
     def visit(self, visitor: AstVisitor) -> Optional[InterfaceDef]:
         return visitor.visit_interface_def(self)
+
+
+@dataclass(frozen=True)
+class StructDef(PrimaryItem):
+    fields: List[FieldDef]
+
+    def visit(self, visitor: AstVisitor) -> Optional[PrimaryItem]:
+        return visitor.visit_struct_def(self)
 
 
 @dataclass(frozen=True)
@@ -178,8 +203,16 @@ class AstVisitor(metaclass=ABCMeta):
         else:
             return None
 
+    def visit_field_def(self, field: FieldDef) -> Optional[FieldDef]:
+        # Children: FieldDef.static_type
+        updated_static_type = self.visit_type(field.static_type)
+        if updated_static_type is not None:
+            return dataclasses.replace(field, static_type=updated_static_type)
+        else:
+            return None
+
     def visit_interface_def(self, interface: InterfaceDef) -> Optional[InterfaceDef]:
-        # Children: InterfaceDef.methods
+        # Children: InterfaceDef.methods, InterfaceDef.fields
         updated_methods = None
         for index, method in enumerate(interface.methods):
             updated_method = self.visit_function_declaration(method)
@@ -187,17 +220,43 @@ class AstVisitor(metaclass=ABCMeta):
                 if updated_methods is None:
                     updated_methods = interface.methods.copy()
                 updated_methods[index] = method
+        updated_fields = None
+        for index, field in enumerate(interface.fields):
+            updated_field = self.visit_field_def(field)
+            if updated_field is not None:
+                if updated_fields is None:
+                    updated_fields = interface.fields.copy()
+                updated_fields[index] = updated_field
+        updates = {}
         if updated_methods is not None:
-            return dataclasses.replace(interface, methods=updated_methods)
+            updates['methods'] = updated_methods
+        if updated_fields is not None:
+            updates['fields'] = updated_fields
+        if updates:
+            return dataclasses.replace(interface, **updates)
         else:
             return None
 
     def visit_opaque_type_def(self, opaque: OpaqueTypeDef) -> Optional[OpaqueTypeDef]:
         return None  # No children to visit
 
+    def visit_struct_def(self, struct: StructDef) -> Optional[StructDef]:
+        # Children: StructDef.fields
+        updated_fields = None
+        for index, field in enumerate(struct.fields):
+            updated_field = self.visit_field_def(field)
+            if updated_field is not None:
+                if updated_fields is None:
+                    updated_fields = struct.fields.copy()
+                updated_fields[index] = updated_field
+        if updated_fields is not None:
+            return dataclasses.replace(struct, fields=updated_fields)
+        else:
+            return None
+
 
 class TypeUpdater(AstVisitor):
-    """Rewrites the types in the AST using a callaback"""
+    """Rewrites the types in the AST using a callback"""
     def __init__(self, updater: Callable[[IvanType], IvanType]):
         self.updater = updater
 

@@ -13,7 +13,7 @@ class Span:
 
 VALID_SYMBOLS = {"{", "}", ":", ";", ",", "&", "*", '@', '=', "(", ")"}
 VALID_KEYWORDS = {"Self", "self", "interface", "fun", "raw", "mut", "own", "opaque", "type",
-                  "true", "false", "opt", "field", "default", "null", "return"}
+                  "true", "false", "opt", "field", "default", "null", "return", "struct"}
 
 
 class TokenType(Enum):
@@ -22,6 +22,7 @@ class TokenType(Enum):
     SYMBOL = 2
     KEYWORD = 3
     STRING_LITERAL = 4
+
 
 class ParseException(Exception):
     span: Span

@@ -2,7 +2,7 @@ from pathlib import Path
 
 from ivan import types
 from ivan.ast import FunctionDeclaration, DocString, InterfaceDef, FunctionArg, OpaqueTypeDef, FunctionSignature, \
-    Annotation, IvanModule
+    Annotation, IvanModule, StructDef, FieldDef
 from ivan.ast.lexer import Span
 from ivan.ast.parser import parse_item, parse_module, Parser, parse_annotation, parse_type
 from ivan.types import ReferenceType, ReferenceKind, FixedIntegerType
@@ -16,6 +16,41 @@ def test_parse_types():
         optional=True
     )
 
+
+def test_parse_struct():
+    assert parse_item(Parser.parse_str("""struct Vector {
+    field x: double;
+    field y: double;
+    field z: double;
+}""")) == StructDef(
+        name="Vector",
+        span=Span(1, 7),
+        fields=[
+            FieldDef(
+                name="x",
+                span=Span(2, 10),
+                static_type=types.DOUBLE,
+                doc_string=None,
+                annotations=[]
+            ),
+            FieldDef(
+                name="y",
+                span=Span(3, 10),
+                static_type=types.DOUBLE,
+                doc_string=None,
+                annotations=[]
+            ),
+            FieldDef(
+                name="z",
+                span=Span(4, 10),
+                static_type=types.DOUBLE,
+                doc_string=None,
+                annotations=[]
+            )
+        ],
+        annotations=[],
+        doc_string=None
+    )
 
 def test_parse_func():
     assert parse_item(Parser.parse_str(
@@ -71,6 +106,7 @@ def test_parse_basic():
                 ["This is a basic example of an ivan interface."],
                 span=Span(1, 0)
             ),
+            fields=[],
             methods=[
                 FunctionDeclaration(
                     name="noArgs",
@@ -155,6 +191,7 @@ def test_parse_basic():
                  "You can have multiple ones defined"],
                 Span(24, 0)
             ),
+            fields=[],
             methods=[
                 FunctionDeclaration(
                     name="test",
@@ -186,6 +223,7 @@ def test_parse_basic():
             name="NoMethods",
             doc_string=None,
             methods=[],
+            fields=[],
             span=Span(35, 10),
             annotations=[]
         ),

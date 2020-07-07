@@ -63,7 +63,7 @@ class C11CodeGenerator(CodeGenerator):
     def declare_function_pointer(self, name: str, signature: FunctionSignature):
         self.write(f'{signature.return_type.print_c11()} (*{name})(')
         self.write(', '.join(f"{arg.arg_type.print_c11()} {arg.arg_name}"
-                                    for arg in signature.args))
+                             for arg in signature.args))
         self.write(')')
 
     def _declare_top_level_function(self, func: FunctionDeclaration):

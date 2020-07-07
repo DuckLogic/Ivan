@@ -4,7 +4,7 @@ from typing import List, Optional, Set
 
 from ivan import types
 from ivan.ast import lexer, DocString, OpaqueTypeDef, InterfaceDef, FunctionDeclaration, FunctionArg, PrimaryItem, \
-    FunctionSignature, Annotation, AnnotationValue, IvanModule, FunctionBody
+    FunctionSignature, Annotation, AnnotationValue, IvanModule, FunctionBody, StructDef, FieldDef, TypeMember
 from ivan.ast.lexer import Token, Span, ParseException, TokenType
 from ivan.types import ReferenceKind, ReferenceType, PrimitiveType, FixedIntegerType, IvanType
 from ivan.types.context import UnresolvedTypeRef
@@ -103,8 +103,9 @@ class Parser:
         return max(0, len(self.tokens) - self.index)
 
 
-ALLOWED_FUNCTION_MODIFIERS = {"default", }
+ALLOWED_FUNCTION_MODIFIERS = {"default",}
 ALLOWED_TYPE_MODIFIERS = set()
+ALLOWED_FIELD_MODIFIERS = set()
 
 
 @dataclasses.dataclass
@@ -125,6 +126,9 @@ class ItemHeader:
 
     def expect_function_definition(self, span: Span):
         self._check_modifiers(ALLOWED_FUNCTION_MODIFIERS, span)
+
+    def expect_field_header(self, span: Span):
+        self._check_modifiers(ALLOWED_FIELD_MODIFIERS, span)
 
 
 def parse_doc_string(parser: Parser) -> Optional[DocString]:
@@ -211,6 +215,38 @@ def parse_opaque_type(parser: Parser, header: ItemHeader) -> OpaqueTypeDef:
     )
 
 
+def parse_struct(parser: Parser, header: ItemHeader) -> StructDef:
+    header.expect_type_header(parser.current_span)
+    parser.expect_keyword('struct')
+    start_span = parser.current_span
+    name = parser.expect_identifier()
+    parser.expect_symbol('{')
+    fields = []
+    while True:
+        token = parser.peek()
+        if token is None:
+            raise ParseException(f"Expected closing brace for {name}", start_span)
+        elif token.is_symbol('}'):
+            parser.pop()
+            return StructDef(
+                name=name,
+                fields=fields,
+                doc_string=header.doc_string,
+                span=start_span,
+                annotations=header.annotations
+            )
+        else:
+            member = parse_type_member(parser)
+            if isinstance(member, FunctionDeclaration):
+                raise NotImplementedError("TODO: Methods on structs")
+            elif isinstance(member, FieldDef):
+                fields.append(member)
+            else:
+                raise ParseException(
+                    f"Unexpected member type: {type(member)}",
+                    member.span
+                )
+
 def parse_interface(parser: Parser, header: ItemHeader) -> InterfaceDef:
     header.expect_type_header(parser.current_span)
     parser.expect_keyword("interface")
@@ -218,40 +254,68 @@ def parse_interface(parser: Parser, header: ItemHeader) -> InterfaceDef:
     name = parser.expect_identifier()
     parser.expect_symbol('{')
     methods = []
-    pending_header: Optional[ItemHeader] = None
+    fields = []
     while True:
         token = parser.peek()
         if token is None:
             raise ParseException(f"Expected closing brace for {name}", start_span)
-        elif token.token_type == TokenType.DOC_COMMENT \
-                or token.is_symbol('@')\
-                or token.is_keyword('default'):
-            if pending_header is not None:
-                raise ParseException(
-                    f"Already encountered header @ {pending_header.span.line}",
-                    token.span
-                )
-            pending_header = parse_item_header(parser)
-            assert pending_header is not None
-        elif token.is_keyword('fun'):
-            if pending_header is None:
-                pending_header = ItemHeader(span=parser.current_span)
-            methods.append(parse_function_declaration(parser, pending_header))
-            pending_header = None
         elif token.is_symbol('}'):
             parser.pop()
-            # End of interface
-            if pending_header is not None:
-                raise ParseException("Unexpected item header", pending_header.span)
             return InterfaceDef(
                 name=name,
                 methods=methods,
+                fields=fields,
                 doc_string=header.doc_string,
                 span=start_span,
                 annotations=header.annotations
             )
         else:
-            raise ParseException("Unexpected token", token.span)
+            member = parse_type_member(parser)
+            if isinstance(member, FunctionDeclaration):
+                methods.append(member)
+            elif isinstance(member, FieldDef):
+                fields.append(member)
+            else:
+                raise ParseException(
+                    f"Unexpected member type: {type(member)}",
+                    member.span
+                )
+
+
+def parse_type_member(parser: Parser) -> TypeMember:
+    token = parser.peek()
+    if token.token_type == TokenType.DOC_COMMENT \
+            or token.is_symbol('@')\
+            or token.is_keyword('default'):
+        header = parse_item_header(parser)
+    else:
+        header = ItemHeader(span=parser.current_span)
+    assert header is not None
+    # Refresh token
+    token = parser.peek()
+    if token.is_keyword('fun'):
+        return parse_function_declaration(parser, header)
+    elif token.is_keyword('field'):
+        return parse_field_def(parser, header)
+    else:
+        raise ParseException(f"Expected type member, but got {token.value}", token.span)
+
+
+def parse_field_def(parser: Parser, header: ItemHeader) -> FieldDef:
+    header.expect_field_header(parser.current_span)
+    parser.expect_keyword('field')
+    start_span = parser.current_span
+    name = parser.expect_identifier()
+    parser.expect_symbol(':')
+    static_type = parse_type(parser)
+    parser.expect_symbol(';')
+    return FieldDef(
+        name=name,
+        span=start_span,
+        static_type=static_type,
+        annotations=header.annotations,
+        doc_string=header.doc_string
+    )
 
 
 def parse_function_signature(parser: Parser) -> FunctionSignature:
@@ -433,6 +497,8 @@ def parse_item(parser: Parser) -> PrimaryItem:
         return parse_function_declaration(parser, header)
     elif token.is_keyword('interface'):
         return parse_interface(parser, header)
+    elif token.is_keyword('struct'):
+        return parse_struct(parser, header)
     elif token.is_keyword('opaque'):
         return parse_opaque_type(parser, header)
     else:
