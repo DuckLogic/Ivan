@@ -5,7 +5,7 @@ from typing import Optional
 
 from ivan import types
 from ivan.ast import FunctionSignature, FunctionBody
-from ivan.ast.expr import IvanExpr, IvanStatement, NullExpr, StatementVisitor, ReturnStatement
+from ivan.ast.expr import IvanExpr, NullExpr, StatementVisitor, ReturnStatement
 from ivan.ast.lexer import Span
 from ivan.generate import CodeWriter
 from ivan.types import IvanType, ReferenceType
@@ -43,8 +43,8 @@ class CompiledExpr:
 
 
 @dataclass(frozen=True)
-class CompiledStatement:
-    original: IvanStatement
+class CompiledBody:
+    original: FunctionBody
     code: str
 
 
@@ -75,9 +75,14 @@ class BaseCompiler(StatementVisitor, ExprCompiler, metaclass=ABCMeta):
         self.writer = writer
         self.func_signature = func_signature
 
-    def compile_body(self, body: FunctionBody):
+    def compile_body(self, body: FunctionBody) -> CompiledBody:
+        assert not str(self.writer), f"Already has code:\n{self.writer}"
         for statement in body.statements:
             statement.visit(self)
+        return CompiledBody(
+            original=body,
+            code=str(self.writer)
+        )
 
 
 class C11Compiler(BaseCompiler):

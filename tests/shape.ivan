@@ -1,30 +1,34 @@
 // An example that mirrors the shapes needed for DuckLogic
 
 /**
- * An opaque object managed by DuckVM.
- *
- * All pointers to these objects are garbage collected
- */
-opaque type DuckObject;
-
-/**
  * A legacy (reference-counted) python object
  */
 opaque type PyObject;
 
 /**
+ * An object managed by DuckVM.
+ *
+ * All pointers to these objects are garbage collected
+ */
+struct DuckObject {
+    field shape: &own PyShape;
+}
+
+@GenerateWrappers(prefix="object")
+impl PyShape for DuckObject {
+    // Specifies that the `PyShape` vtable is retrieved through the 'shape' field
+    vtable field = shape;
+}
+
+/**
  * The shape of a DuckObject
  */
-@GenerateWrappers(prefix="object")
 interface PyShape {
     /**
      * View the underlying legacy representation of this DuckObject.
      * Return NULL if there is no associated PyObject*.
-     *
-     * This is an optional method - a NULL function means this shape
-     * never has an associated PyObject
      */
-    default fun view_legacy_repr(obj: &DuckObject): opt &raw PyObject {
+    default fun view_legacy_repr(&self): opt &raw PyObject {
         return null;
     }
 }

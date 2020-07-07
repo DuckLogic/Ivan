@@ -14,8 +14,10 @@ __all__ = [
     "lexer", "parser", "DocString", "AstVisitor",
     # AST Items
     "PrimaryItem", "InterfaceDef", "FunctionDeclaration", "OpaqueTypeDef",
+    "StructDef",
     # AST Nodes
-    "FunctionArg", "Annotation", "AnnotationValue", "IvanModule",
+    "FunctionArg", "Annotation", "AnnotationValue", "IvanModule", "FunctionBody",
+    "FieldDef", "TypeMember",
     # Misc
     "FunctionSignature",
 ]
@@ -142,6 +144,12 @@ class FunctionDeclaration(PrimaryItem, TypeMember):
 
     def visit(self, visitor: AstVisitor) -> Optional[FunctionDeclaration]:
         return visitor.visit_function_declaration(self)
+
+
+@dataclass(frozen=True)
+class Implementation(frozen=True):
+    interface_name: str
+    target_name: str
 
 
 @dataclass(frozen=True)

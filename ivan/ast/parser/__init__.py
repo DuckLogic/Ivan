@@ -3,8 +3,10 @@ import re
 from typing import List, Optional, Set
 
 from ivan import types
-from ivan.ast import lexer, DocString, OpaqueTypeDef, InterfaceDef, FunctionDeclaration, FunctionArg, PrimaryItem, \
-    FunctionSignature, Annotation, AnnotationValue, IvanModule, FunctionBody, StructDef, FieldDef, TypeMember
+from ivan.ast import lexer, DocString, OpaqueTypeDef, InterfaceDef, \
+    FunctionDeclaration, FunctionArg, PrimaryItem, \
+    FunctionSignature, Annotation, AnnotationValue, IvanModule, FunctionBody,\
+    StructDef, FieldDef, TypeMember
 from ivan.ast.lexer import Token, Span, ParseException, TokenType
 from ivan.types import ReferenceKind, ReferenceType, PrimitiveType, FixedIntegerType, IvanType
 from ivan.types.context import UnresolvedTypeRef
@@ -246,6 +248,7 @@ def parse_struct(parser: Parser, header: ItemHeader) -> StructDef:
                     f"Unexpected member type: {type(member)}",
                     member.span
                 )
+
 
 def parse_interface(parser: Parser, header: ItemHeader) -> InterfaceDef:
     header.expect_type_header(parser.current_span)

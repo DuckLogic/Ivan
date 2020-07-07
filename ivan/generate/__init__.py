@@ -1,5 +1,4 @@
-import dataclasses
-import re
+from dataclasses import dataclass
 from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 from typing import ContextManager, Optional, Iterable, List
@@ -7,6 +6,11 @@ from typing import ContextManager, Optional, Iterable, List
 from ivan.ast import IvanModule, OpaqueTypeDef, InterfaceDef, FunctionDeclaration, DocString, FunctionBody
 from ivan.types import IvanType
 from ivan.types.context import TypeContext
+
+
+@dataclass(frozen=True)
+class VTableAccess:
+    code: str
 
 
 class CodeWriter:
@@ -88,7 +92,6 @@ class CodeGenerator(CodeWriter, metaclass=ABCMeta):
     """The target module we're generating"""
     _queued_wrappers: Optional[List[InterfaceDef]]
     """The list of interfaces want to generate wrappers for"""
-
 
     def __init__(self, module: IvanModule, context: TypeContext):
         super(CodeGenerator, self).__init__()
