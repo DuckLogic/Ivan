@@ -1,10 +1,10 @@
 from abc import ABCMeta, abstractmethod
-from enum import Enum
-from typing import Optional
+
+from ivan.ast.types import ReferenceKind
 
 
-class IvanType(metaclass=ABCMeta):
-    """Base class for the internal type system"""
+class ResolvedType(metaclass=ABCMeta):
+    """Base class for all resolved types"""
     name: str
     """The name of the type, as used in Ivan code
 
@@ -15,18 +15,8 @@ class IvanType(metaclass=ABCMeta):
     def __init__(self, name: str):
         self.name = name
 
-    @abstractmethod
-    def print_c11(self) -> str:
-        """Print this Ivan type as a C11 type"""
-        pass
-
-    @abstractmethod
-    def print_rust(self) -> str:
-        """Print this type as a Rust type"""
-        pass
-
     def __eq__(self, other):
-        return isinstance(other, IvanType) and other.name == self.name
+        return isinstance(other, ResolvedType) and other.name == self.name
 
     def __hash__(self):
         return hash(self.name)
@@ -39,19 +29,91 @@ class IvanType(metaclass=ABCMeta):
         pass
 
 
-class ReferenceKind(Enum):
-    IMMUTABLE = '&'
-    MUTABLE = "&mut"
-    OWNED = "&own"
-    RAW = "&raw"
+class FixedIntegerType(ResolvedType):
+    """An integer type with a fixed bit width"""
+    bits: int
+    signed: bool
+
+    def __init__(self, bits: int, signed: bool):
+        super().__init__(f"i{bits}" if signed else f"u{bits}")
+        if bits not in {8, 16, 32, 64}:
+            raise ValueError(f"Invalid #bits: {bits}")
+        self.bits = bits
+        self.signed = signed
+
+    def print_c11(self) -> str:
+        if self.signed:
+            return f"int{self.bits}_t"
+        else:
+            return f"uint{self.bits}_t"
+
+    def print_rust(self) -> str:
+        return self.name
+
+    def __eq__(self, other):
+        return isinstance(other, FixedIntegerType) and\
+               self.bits == other.bits and self.signed == other.signed
+
+    def __hash__(self):
+        return self.bits if self.signed else -self.bits
+
+    def __repr__(self):
+        return f"FixedIntegerType({self.bits}, {self.signed})"
 
 
-class ReferenceType(IvanType):
-    target: IvanType
+_PRIMITIVE_TYPES = dict()
+
+
+class PrimitiveType(ResolvedType):
+
+    def __init__(self, name: str, c11: str, rust: str):
+        super().__init__(name=name)
+        self.c11_name = c11
+        self.rust_name = rust
+        global _PRIMITIVE_TYPES
+        if _PRIMITIVE_TYPES is None:
+            _PRIMITIVE_TYPES = dict()
+        if name in _PRIMITIVE_TYPES:
+            raise RuntimeError(f"Already defined primitive {name}")
+        _PRIMITIVE_TYPES[name] = self
+
+    c11_name: str
+    rust_name: str
+
+    def print_c11(self) -> str:
+        return self.c11_name
+
+    def print_rust(self) -> str:
+        return self.rust_name
+
+    def __repr__(self):
+        return f"PrimitiveType(name={self.name}, " \
+               f"c11={self.c11_name}, " \
+               f"rust={self.rust_name})"
+
+
+# TODO: This isn't really a full-fledged type in C
+UNIT = PrimitiveType("unit", "void", "()")
+"""The unit type - for functions that don't return any value"""
+
+INT = PrimitiveType("int", "int", "i32")  # NOTE: Assumes sizeof(int) == 32
+"""The idiomatic way to represent a signed 32-bit integer"""
+
+BYTE = PrimitiveType("byte", "char", "u8")
+"""The idiomatic way to represent a byte"""
+
+DOUBLE = PrimitiveType("double", "double", "f64")
+BOOLEAN = PrimitiveType("bool", "bool", "bool")
+USIZE = PrimitiveType("usize", "size_t", "usize")
+ISIZE = PrimitiveType("isize", "intptr_t", "isize")
+
+
+class ReferenceType(ResolvedType):
+    target: ResolvedType
     kind: ReferenceKind
     optional: bool
 
-    def __init__(self, target: IvanType, kind: ReferenceKind, optional: bool = False):
+    def __init__(self, target: ResolvedType, kind: ReferenceKind, optional: bool = False):
         super().__init__(
             ("opt " if optional else "") +
             f"&{target.name}" if kind == ReferenceKind.IMMUTABLE
@@ -92,85 +154,3 @@ class ReferenceType(IvanType):
 
     def __repr__(self):
         return f"ReferenceType({self.target}, {self.kind}, optional={self.optional})"
-
-
-class FixedIntegerType(IvanType):
-    """An integer type with a fixed bit width"""
-    bits: int
-    signed: bool
-
-    def __init__(self, bits: int, signed: bool):
-        super().__init__(f"i{bits}" if signed else f"u{bits}")
-        if bits not in {8, 16, 32, 64}:
-            raise ValueError(f"Invalid #bits: {bits}")
-        self.bits = bits
-        self.signed = signed
-
-    def print_c11(self) -> str:
-        if self.signed:
-            return f"int{self.bits}_t"
-        else:
-            return f"uint{self.bits}_t"
-
-    def print_rust(self) -> str:
-        return self.name
-
-    def __eq__(self, other):
-        return isinstance(other, FixedIntegerType) and\
-               self.bits == other.bits and self.signed == other.signed
-
-    def __hash__(self):
-        return self.bits if self.signed else -self.bits
-
-    def __repr__(self):
-        return f"FixedIntegerType({self.bits}, {self.signed})"
-
-
-_PRIMITIVE_TYPES = dict()
-
-
-class PrimitiveType(IvanType):
-
-    def __init__(self, name: str, c11: str, rust: str):
-        super().__init__(name=name)
-        self.c11_name = c11
-        self.rust_name = rust
-        global _PRIMITIVE_TYPES
-        if _PRIMITIVE_TYPES is None:
-            _PRIMITIVE_TYPES = dict()
-        if name in _PRIMITIVE_TYPES:
-            raise RuntimeError(f"Already defined primitive {name}")
-        _PRIMITIVE_TYPES[name] = self
-
-    c11_name: str
-    rust_name: str
-
-    def print_c11(self) -> str:
-        return self.c11_name
-
-    def print_rust(self) -> str:
-        return self.rust_name
-
-    def __repr__(self):
-        return f"PrimitiveType(name={self.name}, " \
-               f"c11={self.c11_name}, " \
-               f"rust={self.rust_name})"
-
-    @staticmethod
-    def try_parse(s: str) -> Optional["PrimitiveType"]:
-        return _PRIMITIVE_TYPES.get(s)
-
-
-UNIT = PrimitiveType("unit", "void", "()")
-"""The unit type - for functions that don't return any value"""
-
-INT = PrimitiveType("int", "int", "i32")  # NOTE: Assumes sizeof(int) == 32
-"""The idiomatic way to represent a signed 32-bit integer"""
-
-BYTE = PrimitiveType("byte", "char", "u8")
-"""The idiomatic way to represent a byte"""
-
-DOUBLE = PrimitiveType("double", "double", "f64")
-BOOLEAN = PrimitiveType("bool", "bool", "bool")
-USIZE = PrimitiveType("usize", "size_t", "usize")
-ISIZE = PrimitiveType("isize", "intptr_t", "isize")

@@ -8,7 +8,7 @@ from typing import List, Optional, Callable, Union, Dict, Tuple
 
 from .expr import IvanStatement
 from .lexer import Span
-from ..types import IvanType
+from .types import TypeRef
 
 __all__ = [
     "lexer", "parser", "DocString", "AstVisitor",
@@ -84,13 +84,6 @@ class PrimaryItem(metaclass=ABCMeta):
     def visit(self, visitor: AstVisitor) -> Optional[PrimaryItem]:
         pass
 
-    def replace_types(self, updater: Callable[[IvanType], IvanType]) -> PrimaryItem:
-        updated = self.visit(TypeUpdater(updater))
-        if updated is not None:
-            return updated
-        else:
-            return self
-
     def get_annotation(self, name: str) -> Optional[Annotation]:
         # TODO: Check for duplicates
         for annotation in self.annotations:
@@ -112,20 +105,20 @@ class TypeMember(metaclass=ABCMeta):
 
 @dataclass(frozen=True)
 class FieldDef(TypeMember):
-    static_type: IvanType
+    static_type: TypeRef
     """The type of the field"""
 
 
 @dataclass(frozen=True)
 class FunctionArg:
     arg_name: str
-    arg_type: IvanType
+    arg_type: TypeRef
 
 
 @dataclass(frozen=True)
 class FunctionSignature:
     args: List[FunctionArg]
-    return_type: IvanType
+    return_type: TypeRef
 
 
 @dataclass(frozen=True)
@@ -147,9 +140,10 @@ class FunctionDeclaration(PrimaryItem, TypeMember):
 
 
 @dataclass(frozen=True)
-class Implementation(frozen=True):
+class Implementation(PrimaryItem):
     interface_name: str
     target_name: str
+    methods: List[FunctionDeclaration]
 
 
 @dataclass(frozen=True)
@@ -179,7 +173,7 @@ class OpaqueTypeDef(PrimaryItem):
 
 
 class AstVisitor(metaclass=ABCMeta):
-    def visit_type(self, original: IvanType) -> Optional[IvanType]:
+    def visit_type(self, original: TypeRef) -> Optional[TypeRef]:
         return None  # No children
 
     def visit_signature(self, signature: FunctionSignature) -> Optional[FunctionSignature]:
@@ -261,13 +255,4 @@ class AstVisitor(metaclass=ABCMeta):
             return dataclasses.replace(struct, fields=updated_fields)
         else:
             return None
-
-
-class TypeUpdater(AstVisitor):
-    """Rewrites the types in the AST using a callback"""
-    def __init__(self, updater: Callable[[IvanType], IvanType]):
-        self.updater = updater
-
-    def visit_type(self, original: IvanType) -> Optional[IvanType]:
-        return self.updater(original)
 

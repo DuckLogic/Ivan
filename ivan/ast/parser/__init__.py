@@ -1,15 +1,14 @@
 import dataclasses
-import re
 from typing import List, Optional, Set
 
-from ivan import types
+
 from ivan.ast import lexer, DocString, OpaqueTypeDef, InterfaceDef, \
     FunctionDeclaration, FunctionArg, PrimaryItem, \
-    FunctionSignature, Annotation, AnnotationValue, IvanModule, FunctionBody,\
+    FunctionSignature, Annotation, AnnotationValue, IvanModule, FunctionBody, \
     StructDef, FieldDef, TypeMember
 from ivan.ast.lexer import Token, Span, ParseException, TokenType
-from ivan.types import ReferenceKind, ReferenceType, PrimitiveType, FixedIntegerType, IvanType
-from ivan.types.context import UnresolvedTypeRef
+from ivan.ast.types import ReferenceKind, TypeRef, ReferenceTypeRef, OptionalTypeRef, BuiltinType, BuiltinTypeRef, \
+    FixedIntegerRef, NamedTypeRef
 
 
 class Parser:
@@ -351,7 +350,10 @@ def parse_function_signature(parser: Parser) -> FunctionSignature:
             raise ParseException(f"Unexpected token {token.value!r}", token.span)
     t = parser.peek()
     if t.is_symbol(';'):
-        return_type = types.UNIT
+        return_type = BuiltinTypeRef(
+            usage_span=t.span,  # The semicolin is an implicit reference (I guess)
+            type=BuiltinType.UNIT
+        )
     elif t.is_symbol(':'):
         parser.expect_symbol(':')
         return_type = parse_type(parser)
@@ -408,10 +410,7 @@ def parse_function_declaration(parser: Parser, header: ItemHeader) -> FunctionDe
     )
 
 
-FIXED_INTEGER_PATTERN = re.compile("([iu])(8|16|32|64)")
-
-
-def parse_type(parser: Parser) -> IvanType:
+def parse_type(parser: Parser) -> TypeRef:
     try:
         first_token = parser.pop()
     except ParseException:
@@ -436,21 +435,17 @@ def parse_type(parser: Parser) -> IvanType:
             ref_kind = ReferenceKind.IMMUTABLE
         if ref_kind != ReferenceKind.IMMUTABLE:
             parser.pop()  # We need to eat the ref_kind token!
-        return ReferenceType(
-            target=parse_type(parser),
-            kind=ref_kind,
-            optional=False  # Handled by a seperate rule
+        return ReferenceTypeRef(
+            usage_span=first_token.span,
+            inner=parse_type(parser),
+            kind=ref_kind
         )
     elif first_token.is_keyword('opt'):
-        start_span = parser.current_span
         inner_type = parse_type(parser)
-        if isinstance(inner_type, ReferenceType):
-            assert not inner_type.optional
-            # Rebuild
-            return ReferenceType(
-                target=inner_type.target,
-                kind=inner_type.kind,
-                optional=True
+        if isinstance(inner_type, ReferenceTypeRef):
+            return OptionalTypeRef(
+                usage_span=first_token.span,
+                inner=inner_type
             )
         else:
             raise ParseException("Can only have optional references", start_span)
@@ -459,10 +454,16 @@ def parse_type(parser: Parser) -> IvanType:
             f"Unexpected token: {first_token.value!r}",
             first_token.span
         )
-    primitive = PrimitiveType.try_parse(type_name)
-    if primitive is not None:
-        return primitive
-    int_match = FIXED_INTEGER_PATTERN.match(type_name)
+    try:
+        builtin_type = BuiltinType(type_name)
+    except ValueError:
+        builtin_type = None
+    if builtin_type is not None:
+        return BuiltinTypeRef(
+            usage_span=first_token.span,
+            type=builtin_type
+        )
+    int_match = FixedIntegerRef.PATTERN.match(type_name)
     if int_match is not None:
         if int_match.group(1) == 'i':
             signed = True
@@ -470,11 +471,13 @@ def parse_type(parser: Parser) -> IvanType:
             signed = False
         else:
             raise AssertionError(int_match.group(1))
-        return FixedIntegerType(
+        return FixedIntegerRef(
+            usage_span=first_token.span,
             bits=int(int_match.group(2)),
             signed=signed
         )
-    return UnresolvedTypeRef(type_name, usage_span=first_token.span)
+    assert type_name.isidentifier()
+    return NamedTypeRef(usage_span=first_token.span, name=type_name)
 
 
 def parse_item_header(parser: Parser) -> ItemHeader:

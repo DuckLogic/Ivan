@@ -8,7 +8,7 @@ from ivan.ast import FunctionSignature, FunctionBody
 from ivan.ast.expr import IvanExpr, NullExpr, StatementVisitor, ReturnStatement
 from ivan.ast.lexer import Span
 from ivan.generate import CodeWriter
-from ivan.types import IvanType, ReferenceType
+from ivan.types import ResolvedType, ReferenceType
 from ivan.types.context import TypeContext
 
 
@@ -26,10 +26,10 @@ class CompileException(Exception):
 
 
 class IncompatibleTypeException(CompileException):
-    desired: IvanType
+    desired: ResolvedType
     actual: str
 
-    def __init__(self, desired_type: IvanType, actual_type: str, span: Span):
+    def __init__(self, desired_type: ResolvedType, actual_type: str, span: Span):
         super().__init__(f"Can't compile an {actual_type} to a {desired_type}", span)
         self.desired = desired_type
         self.actual = actual_type
@@ -38,7 +38,7 @@ class IncompatibleTypeException(CompileException):
 @dataclass(frozen=True)
 class CompiledExpr:
     original: IvanExpr
-    static_type: IvanType
+    static_type: ResolvedType
     code: str
 
 
@@ -52,18 +52,18 @@ class CompiledBody:
 class CompilerContext:
     context_name: str
     types: TypeContext
-    return_type: Optional[IvanType] = None
+    return_type: Optional[ResolvedType] = None
 
 
 class ExprCompiler(metaclass=ABCMeta):
-    def compile_expr(self, expr: IvanExpr, desired_type: IvanType) -> CompiledExpr:
+    def compile_expr(self, expr: IvanExpr, desired_type: ResolvedType) -> CompiledExpr:
         if isinstance(expr, NullExpr):
             return self.compile_null_expr(expr, desired_type)
         else:
             raise TypeError(f"Unknown expression type: {type(desired_type)}")
 
     @abstractmethod
-    def compile_null_expr(self, expr: NullExpr, desired_type: IvanType) -> CompiledExpr:
+    def compile_null_expr(self, expr: NullExpr, desired_type: ResolvedType) -> CompiledExpr:
         pass
 
 
@@ -100,7 +100,7 @@ class C11Compiler(BaseCompiler):
             self.writer.write(f' {value.code}')
         self.writer.writeln(';')
 
-    def compile_null_expr(self, expr: NullExpr, desired_type: IvanType) -> CompiledExpr:
+    def compile_null_expr(self, expr: NullExpr, desired_type: ResolvedType) -> CompiledExpr:
         if isinstance(desired_type, ReferenceType) and desired_type.optional:
             return CompiledExpr(
                 original=expr,
