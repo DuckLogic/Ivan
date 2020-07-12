@@ -11,7 +11,7 @@ from .lexer import Span
 from .types import TypeRef
 
 __all__ = [
-    "lexer", "parser", "DocString", "AstVisitor",
+    "lexer", "parser", "DocString",
     # AST Items
     "PrimaryItem", "InterfaceDef", "FunctionDeclaration", "OpaqueTypeDef",
     "StructDef",
@@ -80,10 +80,6 @@ class PrimaryItem(metaclass=ABCMeta):
     """The documentation for this item"""
     annotations: List[Annotation]
 
-    @abstractmethod
-    def visit(self, visitor: AstVisitor) -> Optional[PrimaryItem]:
-        pass
-
     def get_annotation(self, name: str) -> Optional[Annotation]:
         # TODO: Check for duplicates
         for annotation in self.annotations:
@@ -135,9 +131,6 @@ class FunctionDeclaration(PrimaryItem, TypeMember):
     body: Optional[FunctionBody]
     """The body of this function, or None if its an abstract definition"""
 
-    def visit(self, visitor: AstVisitor) -> Optional[FunctionDeclaration]:
-        return visitor.visit_function_declaration(self)
-
 
 @dataclass(frozen=True)
 class Implementation(PrimaryItem):
@@ -152,107 +145,12 @@ class InterfaceDef(PrimaryItem):
     fields: List[FieldDef]
     methods: List[FunctionDeclaration]
 
-    def visit(self, visitor: AstVisitor) -> Optional[InterfaceDef]:
-        return visitor.visit_interface_def(self)
-
 
 @dataclass(frozen=True)
 class StructDef(PrimaryItem):
     fields: List[FieldDef]
 
-    def visit(self, visitor: AstVisitor) -> Optional[PrimaryItem]:
-        return visitor.visit_struct_def(self)
-
 
 @dataclass(frozen=True)
 class OpaqueTypeDef(PrimaryItem):
     """The definition of an opaque type"""
-
-    def visit(self, visitor: AstVisitor) -> Optional[OpaqueTypeDef]:
-        return visitor.visit_opaque_type_def(self)
-
-
-class AstVisitor(metaclass=ABCMeta):
-    def visit_type(self, original: TypeRef) -> Optional[TypeRef]:
-        return None  # No children
-
-    def visit_signature(self, signature: FunctionSignature) -> Optional[FunctionSignature]:
-        # Children: FunctionSignature.args, FunctionSignature.return_type
-        copied_args = None
-        for index, original_arg in enumerate(signature.args):
-            updated_type = self.visit_type(original_arg.arg_type)
-            if updated_type is not None:
-                if copied_args is None:
-                    copied_args = signature.args.copy()
-                copied_args[index] = FunctionArg(
-                    arg_name=original_arg.arg_name,
-                    arg_type=updated_type
-                )
-        updated_return_type = self.visit_type(signature.return_type)
-        if copied_args is None and updated_return_type is None:
-            return None
-        return FunctionSignature(
-            args=copied_args if copied_args is not None else signature.args,
-            return_type=updated_return_type if updated_return_type is not None
-            else signature.return_type
-        )
-
-    def visit_function_declaration(self, func: FunctionDeclaration) -> Optional[FunctionDeclaration]:
-        # Children: FunctionDeclaration.signature
-        updated_signature = self.visit_signature(func.signature)
-        if updated_signature is not None:
-            return dataclasses.replace(func, signature=updated_signature)
-        else:
-            return None
-
-    def visit_field_def(self, field: FieldDef) -> Optional[FieldDef]:
-        # Children: FieldDef.static_type
-        updated_static_type = self.visit_type(field.static_type)
-        if updated_static_type is not None:
-            return dataclasses.replace(field, static_type=updated_static_type)
-        else:
-            return None
-
-    def visit_interface_def(self, interface: InterfaceDef) -> Optional[InterfaceDef]:
-        # Children: InterfaceDef.methods, InterfaceDef.fields
-        updated_methods = None
-        for index, method in enumerate(interface.methods):
-            updated_method = self.visit_function_declaration(method)
-            if updated_method is not None:
-                if updated_methods is None:
-                    updated_methods = interface.methods.copy()
-                updated_methods[index] = method
-        updated_fields = None
-        for index, field in enumerate(interface.fields):
-            updated_field = self.visit_field_def(field)
-            if updated_field is not None:
-                if updated_fields is None:
-                    updated_fields = interface.fields.copy()
-                updated_fields[index] = updated_field
-        updates = {}
-        if updated_methods is not None:
-            updates['methods'] = updated_methods
-        if updated_fields is not None:
-            updates['fields'] = updated_fields
-        if updates:
-            return dataclasses.replace(interface, **updates)
-        else:
-            return None
-
-    def visit_opaque_type_def(self, opaque: OpaqueTypeDef) -> Optional[OpaqueTypeDef]:
-        return None  # No children to visit
-
-    def visit_struct_def(self, struct: StructDef) -> Optional[StructDef]:
-        # Children: StructDef.fields
-        updated_fields = None
-        for index, field in enumerate(struct.fields):
-            updated_field = self.visit_field_def(field)
-            if updated_field is not None:
-                if updated_fields is None:
-                    updated_fields = struct.fields.copy()
-                updated_fields[index] = updated_field
-        if updated_fields is not None:
-            return dataclasses.replace(struct, fields=updated_fields)
-        else:
-            return None
-
