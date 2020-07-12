@@ -7,8 +7,7 @@ from ivan.ast import lexer, DocString, OpaqueTypeDef, InterfaceDef, \
     FunctionSignature, Annotation, AnnotationValue, IvanModule, FunctionBody, \
     StructDef, FieldDef, TypeMember
 from ivan.ast.lexer import Token, Span, ParseException, TokenType
-from ivan.ast.types import ReferenceKind, TypeRef, ReferenceTypeRef, OptionalTypeRef, BuiltinType, BuiltinTypeRef, \
-    FixedIntegerRef, NamedTypeRef
+from ivan.ast.types import ReferenceKind, TypeRef, ReferenceTypeRef, OptionalTypeRef, NamedTypeRef
 
 
 class Parser:
@@ -350,9 +349,10 @@ def parse_function_signature(parser: Parser) -> FunctionSignature:
             raise ParseException(f"Unexpected token {token.value!r}", token.span)
     t = parser.peek()
     if t.is_symbol(';'):
-        return_type = BuiltinTypeRef(
+        # TODO: Clearer handling of unit (C11's void != Rust's `()`)
+        return_type = NamedTypeRef(
             usage_span=t.span,  # The semicolin is an implicit reference (I guess)
-            type=BuiltinType.UNIT
+            name='unit'
         )
     elif t.is_symbol(':'):
         parser.expect_symbol(':')
@@ -418,9 +418,7 @@ def parse_type(parser: Parser) -> TypeRef:
             "Unexpected EOF: Expected type",
             parser.last_span
         ) from None
-    if first_token.token_type == TokenType.IDENTIFIER:
-        type_name = first_token.value
-    elif first_token.is_symbol('&'):
+    if first_token.is_symbol('&'):
         # We have a reference!
         ref_token = parser.peek()
         if ref_token is None:
@@ -448,36 +446,17 @@ def parse_type(parser: Parser) -> TypeRef:
                 inner=inner_type
             )
         else:
-            raise ParseException("Can only have optional references", start_span)
+            raise ParseException("Can only have optional references", first_token.span)
+    elif first_token.token_type == TokenType.IDENTIFIER:
+        return NamedTypeRef(
+            name=first_token.value,
+            usage_span=first_token.span
+        )
     else:
         raise ParseException(
             f"Unexpected token: {first_token.value!r}",
             first_token.span
         )
-    try:
-        builtin_type = BuiltinType(type_name)
-    except ValueError:
-        builtin_type = None
-    if builtin_type is not None:
-        return BuiltinTypeRef(
-            usage_span=first_token.span,
-            type=builtin_type
-        )
-    int_match = FixedIntegerRef.PATTERN.match(type_name)
-    if int_match is not None:
-        if int_match.group(1) == 'i':
-            signed = True
-        elif int_match.group(1) == 'u':
-            signed = False
-        else:
-            raise AssertionError(int_match.group(1))
-        return FixedIntegerRef(
-            usage_span=first_token.span,
-            bits=int(int_match.group(2)),
-            signed=signed
-        )
-    assert type_name.isidentifier()
-    return NamedTypeRef(usage_span=first_token.span, name=type_name)
 
 
 def parse_item_header(parser: Parser) -> ItemHeader:

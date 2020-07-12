@@ -4,8 +4,7 @@ from ivan.ast import FunctionDeclaration, DocString, InterfaceDef, FunctionArg, 
     Annotation, IvanModule, StructDef, FieldDef
 from ivan.ast.lexer import Span
 from ivan.ast.parser import parse_item, parse_module, Parser, parse_annotation, parse_type
-from ivan.ast.types import ReferenceKind, OptionalTypeRef, ReferenceTypeRef, BuiltinTypeRef, BuiltinType, NamedTypeRef, \
-    FixedIntegerRef
+from ivan.ast.types import ReferenceKind, OptionalTypeRef, ReferenceTypeRef, NamedTypeRef
 
 
 def test_parse_types():
@@ -14,10 +13,7 @@ def test_parse_types():
         inner=ReferenceTypeRef(
             usage_span=Span(1, 4),
             kind=ReferenceKind.IMMUTABLE,
-            inner=BuiltinTypeRef(
-                usage_span=Span(1, 5),
-                type=BuiltinType.BYTE
-            )
+            inner=NamedTypeRef(Span(1, 5), 'byte')
         )
     )
 
@@ -34,20 +30,22 @@ def test_parse_struct():
             FieldDef(
                 name="x",
                 span=Span(2, 10),
-                static_type=BuiltinTypeRef(Span(2, 13), BuiltinType.DOUBLE),
+                static_type=NamedTypeRef(Span(2, 13), 'double'),
                 doc_string=None,
                 annotations=[]
             ),
             FieldDef(
                 name="y",
                 span=Span(3, 10),
-                static_type=BuiltinTypeRef(Span(3, 13), BuiltinType.DOUBLE),                doc_string=None,
+                static_type=NamedTypeRef(Span(3, 13), 'double'),
+                doc_string=None,
                 annotations=[]
             ),
             FieldDef(
                 name="z",
                 span=Span(4, 10),
-                static_type=BuiltinTypeRef(Span(4, 13), BuiltinType.DOUBLE),                doc_string=None,
+                static_type=NamedTypeRef(Span(4, 13), 'double'),
+                doc_string=None,
                 annotations=[]
             )
         ],
@@ -71,10 +69,10 @@ def test_parse_func():
         ),
         signature=FunctionSignature(
             args=[
-                FunctionArg("i", BuiltinTypeRef(Span(6, 17), BuiltinType.INT)),
-                FunctionArg("floating", BuiltinTypeRef(Span(6, 32), BuiltinType.DOUBLE))
+                FunctionArg("i", NamedTypeRef(Span(6, 17), 'int')),
+                FunctionArg("floating", NamedTypeRef(Span(6, 32), 'double'))
             ],
-            return_type=BuiltinTypeRef(Span(6, 39), BuiltinType.UNIT),
+            return_type=NamedTypeRef(Span(6, 39), 'unit'),
         ),
         annotations=[],
         span=Span(6, 8),
@@ -116,7 +114,7 @@ def test_parse_basic():
                     doc_string=None,
                     signature=FunctionSignature(
                         args=[],
-                        return_type=FixedIntegerRef(Span(6, 18), bits=64, signed=True),
+                        return_type=NamedTypeRef(Span(6, 18), 'i64'),
                     ),
                     annotations=[],
                     span=Span(6, 8),
@@ -140,19 +138,19 @@ def test_parse_basic():
                         args=[
                             FunctionArg("bytes", ReferenceTypeRef(
                                 usage_span=Span(17, 27),
-                                inner=BuiltinTypeRef(Span(17, 28), BuiltinType.BYTE),
+                                inner=NamedTypeRef(Span(17, 28), 'byte'),
                                 kind=ReferenceKind.IMMUTABLE
                             )),
-                            FunctionArg("start", BuiltinTypeRef(
-                                Span(17, 41), BuiltinType.USIZE
+                            FunctionArg("start", NamedTypeRef(
+                                Span(17, 41), 'usize'
                             )),
                             FunctionArg("result", ReferenceTypeRef(
                                 usage_span=Span(17, 56),
-                                inner=BuiltinTypeRef(Span(17, 61), BuiltinType.USIZE),
+                                inner=NamedTypeRef(Span(17, 61), 'usize'),
                                 kind=ReferenceKind.MUTABLE
                             ))
                         ],
-                        return_type=BuiltinTypeRef(Span(17, 69), BuiltinType.BOOLEAN),
+                        return_type=NamedTypeRef(Span(17, 69), 'bool'),
                     ),
                     span=Span(17, 8),
                     body=None
@@ -164,7 +162,7 @@ def test_parse_basic():
                         args=[],
                         return_type=ReferenceTypeRef(
                             usage_span=Span(21, 27),
-                            inner=BuiltinTypeRef(Span(21, 32), BuiltinType.BYTE),
+                            inner=NamedTypeRef(Span(21, 32), 'byte'),
                             kind=ReferenceKind.RAW
                         ),
                     ),
@@ -206,11 +204,11 @@ def test_parse_basic():
                     doc_string=None,
                     signature=FunctionSignature(
                         args=[
-                            FunctionArg("d", BuiltinTypeRef(
-                                Span(31, 16), BuiltinType.DOUBLE
+                            FunctionArg("d", NamedTypeRef(
+                                Span(31, 16), 'double'
                             ))
                         ],
-                        return_type=BuiltinTypeRef(Span(31, 23), BuiltinType.UNIT),
+                        return_type=NamedTypeRef(Span(31, 23), 'unit'),
                     ),
                     span=Span(31, 8),
                     annotations=[],
@@ -256,7 +254,7 @@ def test_parse_basic():
                         usage_span=Span(44, 16)
                     ))
                 ],
-                return_type=BuiltinTypeRef(Span(44, 24), BuiltinType.UNIT),
+                return_type=NamedTypeRef(Span(44, 24), 'unit'),
             ),
             span=Span(44, 4),
             annotations=[],

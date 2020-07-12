@@ -4,12 +4,11 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ivan import types
-from ivan.ast import FunctionSignature, FunctionBody
+from ivan.ast import FunctionSignature, FunctionBody, TypeRef
 from ivan.ast.expr import IvanExpr, NullExpr, StatementVisitor, ReturnStatement
 from ivan.ast.lexer import Span
+from ivan.compiler.types import IvanType
 from ivan.generate import CodeWriter
-from ivan.types import ResolvedType, ReferenceType
-from ivan.types.context import TypeContext
 
 
 class CompileException(Exception):
@@ -20,16 +19,16 @@ class CompileException(Exception):
         self.span = span
 
     def __str__(self):
-        # TODO: This seems inconsistent with other places where we
+        # TODO: This seems inconsistent with other error printing
         # We need a more consistent way to handle error spans :p
         return str(super()) + f" @ {self.span}"
 
 
 class IncompatibleTypeException(CompileException):
-    desired: ResolvedType
+    desired: IvanType
     actual: str
 
-    def __init__(self, desired_type: ResolvedType, actual_type: str, span: Span):
+    def __init__(self, desired_type: IvanType, actual_type: str, span: Span):
         super().__init__(f"Can't compile an {actual_type} to a {desired_type}", span)
         self.desired = desired_type
         self.actual = actual_type
@@ -38,7 +37,7 @@ class IncompatibleTypeException(CompileException):
 @dataclass(frozen=True)
 class CompiledExpr:
     original: IvanExpr
-    static_type: ResolvedType
+    static_type: IvanType
     code: str
 
 
@@ -51,19 +50,18 @@ class CompiledBody:
 @dataclass(frozen=True)
 class CompilerContext:
     context_name: str
-    types: TypeContext
-    return_type: Optional[ResolvedType] = None
+    return_type: Optional[IvanType] = None
 
 
 class ExprCompiler(metaclass=ABCMeta):
-    def compile_expr(self, expr: IvanExpr, desired_type: ResolvedType) -> CompiledExpr:
+    def compile_expr(self, expr: IvanExpr, desired_type: IvanType) -> CompiledExpr:
         if isinstance(expr, NullExpr):
             return self.compile_null_expr(expr, desired_type)
         else:
             raise TypeError(f"Unknown expression type: {type(desired_type)}")
 
     @abstractmethod
-    def compile_null_expr(self, expr: NullExpr, desired_type: ResolvedType) -> CompiledExpr:
+    def compile_null_expr(self, expr: NullExpr, desired_type: IvanType) -> CompiledExpr:
         pass
 
 
@@ -74,6 +72,9 @@ class BaseCompiler(StatementVisitor, ExprCompiler, metaclass=ABCMeta):
     def __init__(self, writer: CodeWriter, func_signature: FunctionSignature):
         self.writer = writer
         self.func_signature = func_signature
+
+    def resolve(self, target: TypeRef) -> IvanType:
+        raise NotImplementedError
 
     def compile_body(self, body: FunctionBody) -> CompiledBody:
         assert not str(self.writer), f"Already has code:\n{self.writer}"
@@ -100,8 +101,8 @@ class C11Compiler(BaseCompiler):
             self.writer.write(f' {value.code}')
         self.writer.writeln(';')
 
-    def compile_null_expr(self, expr: NullExpr, desired_type: ResolvedType) -> CompiledExpr:
-        if isinstance(desired_type, ReferenceType) and desired_type.optional:
+    def compile_null_expr(self, expr: NullExpr, desired_type: IvanType) -> CompiledExpr:
+        if isinstance(desired_type, IvanType) and desired_type.optional:
             return CompiledExpr(
                 original=expr,
                 static_type=desired_type,
