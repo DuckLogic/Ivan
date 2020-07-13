@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from ivan.ast import FunctionDeclaration, DocString, InterfaceDef, FunctionArg, OpaqueTypeDef, FunctionSignature, \
-    Annotation, IvanModule, StructDef, FieldDef
+    Annotation, IvanModule, StructDef, FieldDef, SimpleArgument
 from ivan.ast.lexer import Span
 from ivan.ast.parser import parse_item, parse_module, Parser, parse_annotation, parse_type
 from ivan.ast.types import ReferenceKind, OptionalTypeRef, ReferenceTypeRef, NamedTypeRef
@@ -69,8 +69,8 @@ def test_parse_func():
         ),
         signature=FunctionSignature(
             args=[
-                FunctionArg("i", NamedTypeRef(Span(6, 17), 'int')),
-                FunctionArg("floating", NamedTypeRef(Span(6, 32), 'double'))
+                SimpleArgument("i", NamedTypeRef(Span(6, 17), 'int')),
+                SimpleArgument("floating", NamedTypeRef(Span(6, 32), 'double'))
             ],
             return_type=NamedTypeRef(Span(6, 39), 'unit'),
         ),
@@ -135,15 +135,15 @@ def test_parse_basic():
                     annotations=[],
                     signature=FunctionSignature(
                         args=[
-                            FunctionArg("bytes", ReferenceTypeRef(
+                            SimpleArgument("bytes", ReferenceTypeRef(
                                 usage_span=Span(17, 27),
                                 inner=NamedTypeRef(Span(17, 28), 'byte'),
                                 kind=ReferenceKind.IMMUTABLE
                             )),
-                            FunctionArg("start", NamedTypeRef(
+                            SimpleArgument("start", NamedTypeRef(
                                 Span(17, 41), 'usize'
                             )),
-                            FunctionArg("result", ReferenceTypeRef(
+                            SimpleArgument("result", ReferenceTypeRef(
                                 usage_span=Span(17, 56),
                                 inner=NamedTypeRef(Span(17, 61), 'usize'),
                                 kind=ReferenceKind.MUTABLE
@@ -202,7 +202,7 @@ def test_parse_basic():
                     doc_string=None,
                     signature=FunctionSignature(
                         args=[
-                            FunctionArg("d", NamedTypeRef(
+                            SimpleArgument("d", NamedTypeRef(
                                 Span(31, 16), 'double'
                             ))
                         ],
@@ -246,7 +246,7 @@ def test_parse_basic():
             doc_string=None,
             signature=FunctionSignature(
                 args=[
-                    FunctionArg("e", NamedTypeRef(
+                    SimpleArgument("e", NamedTypeRef(
                         name="Example",
                         usage_span=Span(44, 16)
                     ))

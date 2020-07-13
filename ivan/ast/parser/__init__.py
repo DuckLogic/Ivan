@@ -1,11 +1,10 @@
 import dataclasses
 from typing import List, Optional, Set
 
-
 from ivan.ast import lexer, DocString, OpaqueTypeDef, InterfaceDef, \
-    FunctionDeclaration, FunctionArg, PrimaryItem, \
+    FunctionDeclaration, PrimaryItem, \
     FunctionSignature, Annotation, AnnotationValue, IvanModule, FunctionBody, \
-    StructDef, FieldDef, TypeMember
+    StructDef, FieldDef, TypeMember, SimpleArgument
 from ivan.ast.lexer import Token, Span, ParseException, TokenType
 from ivan.ast.types import ReferenceKind, TypeRef, ReferenceTypeRef, OptionalTypeRef, NamedTypeRef
 
@@ -343,7 +342,7 @@ def parse_function_signature(parser: Parser) -> FunctionSignature:
             arg_name = parser.expect_identifier()
             parser.expect_symbol(':')
             arg_type = parse_type(parser)
-            args.append(FunctionArg(arg_name=arg_name, arg_type=arg_type))
+            args.append(SimpleArgument(name=arg_name, declared_type=arg_type))
             trailing = parser.pop()
             if trailing.is_symbol(','):
                 continue  # continue parsing args

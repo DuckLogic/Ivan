@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import dataclasses
 import re
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 from dataclasses import dataclass
-from typing import List, Optional, Callable, Union, Dict, Tuple
+from typing import List, Optional, Union, Dict, Tuple
 
 from .expr import IvanStatement
 from .lexer import Span
-from .types import TypeRef
+from .types import TypeRef, ResolvedType, BuiltinType, BuiltinKind
 
 __all__ = [
     "lexer", "parser", "DocString",
@@ -105,16 +104,50 @@ class FieldDef(TypeMember):
     """The type of the field"""
 
 
-@dataclass(frozen=True)
-class FunctionArg:
-    arg_name: str
-    arg_type: TypeRef
 
+
+@dataclass(frozen=True)
+class MethodSelfArgument:
+    """The initial 'self' argument to the method"""
+    reference_kind: Optional[ReferenceKind]
+    """None if the method is passed by value,
+    otherwise it is the kind of reference.
+     
+    For example `&self` vs `&mut self`"""
+    resolved_type: ResolvedType
+    """The resolved type of self.
+    
+    Points to the type that declared the method"""
+
+
+@dataclass(frozen=True)
+class SimpleArgument:
+    name: str
+    declared_type: TypeRef
+
+
+FunctionArg = Union[MethodSelfArgument, SimpleArgument]
 
 @dataclass(frozen=True)
 class FunctionSignature:
     args: List[FunctionArg]
     return_type: TypeRef
+
+    def __post_init__(self):
+        for arg in self.args[1:]:
+            assert not isinstance(arg, MethodSelfArgument), \
+                f"Expected simple args after first: {self.args!r}"
+
+    @property
+    def is_method(self) -> bool:
+        args = self.args
+        return args and isinstance(args[0], MethodSelfArgument)
+
+    @property
+    def is_unit_return(self) -> bool:
+        resolved = self.return_type.resolved
+        return isinstance(resolved, BuiltinType) and \
+            resolved.kind == BuiltinKind.UNIT
 
 
 @dataclass(frozen=True)
@@ -133,22 +166,14 @@ class FunctionDeclaration(PrimaryItem, TypeMember):
 
 
 @dataclass(frozen=True)
-class Implementation(PrimaryItem):
-    interface_name: str
-    target_name: str
-    methods: List[FunctionDeclaration]
-
-
-@dataclass(frozen=True)
 class InterfaceDef(PrimaryItem):
     """The definition of an interface"""
-    fields: List[FieldDef]
-    methods: List[FunctionDeclaration]
+    members: Dict[str, TypeMember]
 
 
 @dataclass(frozen=True)
 class StructDef(PrimaryItem):
-    fields: List[FieldDef]
+    fields: Dict[str, FieldDef]
 
 
 @dataclass(frozen=True)
