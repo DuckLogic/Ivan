@@ -221,7 +221,7 @@ def parse_struct(parser: Parser, header: ItemHeader) -> StructDef:
     start_span = parser.current_span
     name = parser.expect_identifier()
     parser.expect_symbol('{')
-    fields = []
+    fields = {}
     while True:
         token = parser.peek()
         if token is None:
@@ -238,9 +238,18 @@ def parse_struct(parser: Parser, header: ItemHeader) -> StructDef:
         else:
             member = parse_type_member(parser)
             if isinstance(member, FunctionDeclaration):
-                raise NotImplementedError("TODO: Methods on structs")
+                raise ParseException(
+                    "TODO: Methods on structs",
+                    member.span
+                )
             elif isinstance(member, FieldDef):
-                fields.append(member)
+                if member.name in fields:
+                    raise ParseException(
+                        f"Duplicate field {member.name}",
+                        member.span
+                    )
+                else:
+                    fields[member.name] = member
             else:
                 raise ParseException(
                     f"Unexpected member type: {type(member)}",
@@ -254,8 +263,7 @@ def parse_interface(parser: Parser, header: ItemHeader) -> InterfaceDef:
     start_span = parser.current_span
     name = parser.expect_identifier()
     parser.expect_symbol('{')
-    methods = []
-    fields = []
+    members = {}
     while True:
         token = parser.peek()
         if token is None:
@@ -264,18 +272,22 @@ def parse_interface(parser: Parser, header: ItemHeader) -> InterfaceDef:
             parser.pop()
             return InterfaceDef(
                 name=name,
-                methods=methods,
-                fields=fields,
+                members=members,
                 doc_string=header.doc_string,
                 span=start_span,
                 annotations=header.annotations
             )
         else:
             member = parse_type_member(parser)
-            if isinstance(member, FunctionDeclaration):
-                methods.append(member)
-            elif isinstance(member, FieldDef):
-                fields.append(member)
+            if isinstance(member, FunctionDeclaration) or\
+                    isinstance(member, FieldDef):
+                if member.name in members:
+                    raise ParseException(
+                        f"Duplicate member: {member.name}",
+                        member.span
+                    )
+                else:
+                    members[member.name] = member
             else:
                 raise ParseException(
                     f"Unexpected member type: {type(member)}",

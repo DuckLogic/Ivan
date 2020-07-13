@@ -26,29 +26,29 @@ def test_parse_struct():
 }""")) == StructDef(
         name="Vector",
         span=Span(1, 7),
-        fields=[
-            FieldDef(
+        fields={
+            "x": FieldDef(
                 name="x",
                 span=Span(2, 10),
                 static_type=NamedTypeRef(Span(2, 13), 'double'),
                 doc_string=None,
                 annotations=[]
             ),
-            FieldDef(
+            "y": FieldDef(
                 name="y",
                 span=Span(3, 10),
                 static_type=NamedTypeRef(Span(3, 13), 'double'),
                 doc_string=None,
                 annotations=[]
             ),
-            FieldDef(
+            "z": FieldDef(
                 name="z",
                 span=Span(4, 10),
                 static_type=NamedTypeRef(Span(4, 13), 'double'),
                 doc_string=None,
                 annotations=[]
             )
-        ],
+        },
         annotations=[],
         doc_string=None
     )
@@ -107,9 +107,8 @@ def test_parse_basic():
                 ["This is a basic example of an ivan interface."],
                 span=Span(1, 0)
             ),
-            fields=[],
-            methods=[
-                FunctionDeclaration(
+            members={
+                "noArgs": FunctionDeclaration(
                     name="noArgs",
                     doc_string=None,
                     signature=FunctionSignature(
@@ -120,7 +119,7 @@ def test_parse_basic():
                     span=Span(6, 8),
                     body=None
                 ),
-                FunctionDeclaration(
+                "findInBytes": FunctionDeclaration(
                     name="findInBytes",
                     doc_string=DocString(
                         ["Find the value by searching through the specified bytes.",
@@ -155,7 +154,7 @@ def test_parse_basic():
                     span=Span(17, 8),
                     body=None
                 ),
-                FunctionDeclaration(
+                "complexLifetime": FunctionDeclaration(
                     name="complexLifetime",
                     doc_string=None,
                     signature=FunctionSignature(
@@ -176,7 +175,7 @@ def test_parse_basic():
                     span=Span(21, 8),
                     body=None
                 ),
-            ],
+            },
             span=Span(5, 10),
             annotations=[
                 Annotation(
@@ -197,9 +196,8 @@ def test_parse_basic():
                  "You can have multiple ones defined"],
                 Span(24, 0)
             ),
-            fields=[],
-            methods=[
-                FunctionDeclaration(
+            members={
+                "test": FunctionDeclaration(
                     name="test",
                     doc_string=None,
                     signature=FunctionSignature(
@@ -214,7 +212,7 @@ def test_parse_basic():
                     annotations=[],
                     body=None
                 )
-            ],
+            },
             span=Span(30, 10),
             annotations=[
                 Annotation(
@@ -230,8 +228,7 @@ def test_parse_basic():
         InterfaceDef(
             name="NoMethods",
             doc_string=None,
-            methods=[],
-            fields=[],
+            members={},
             span=Span(35, 10),
             annotations=[]
         ),
